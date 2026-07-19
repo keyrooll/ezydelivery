@@ -8,7 +8,7 @@
 <script src="configs/ezydelivery.js"></script>
 <style>
   :root{ --green:#1a7a4a; --green2:#2d9e62; --bg:#f4f6f5; --card:#fff;
-         --line:#e3e8e5; --mid:#6b7280; --ink:#14241c; --amber:#f59e0b; }
+         --line:#e3e8e5; --mid:#6b7280; --ink:#14241c; --amber:#f59e0b; --blue:#2563eb; }
   *{ box-sizing:border-box; }
   body{ margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
         background:var(--bg); color:var(--ink); }
@@ -18,269 +18,474 @@
   header .brand img{ height:38px; width:38px; border-radius:9px; background:#fff; padding:3px; object-fit:contain; }
   header .brand .name{ font-size:16px; font-weight:800; line-height:1.1; }
   header .brand .tag{ font-size:10px; opacity:.85; font-weight:500; }
-  header .who{ font-size:12px; opacity:.85; }
-  .wrap{ max-width:900px; margin:0 auto; padding:12px; }
-  .tabs{ display:flex; gap:6px; margin:6px 0 12px; }
-  .tabs button{ flex:1; padding:9px; border:1px solid var(--line); background:#fff;
+  header .who{ font-size:12px; text-align:right; line-height:1.3; }
+  header .who .role{ display:inline-block; background:rgba(255,255,255,.2); padding:1px 7px;
+    border-radius:10px; font-size:10px; text-transform:uppercase; font-weight:700; margin-top:2px; }
+  header .who a{ color:#fff; opacity:.8; font-size:11px; cursor:pointer; text-decoration:underline; }
+  .wrap{ max-width:960px; margin:0 auto; padding:12px; }
+  nav.tabs{ display:flex; gap:6px; margin:6px 0 12px; flex-wrap:wrap; }
+  nav.tabs button{ padding:8px 14px; border:1px solid var(--line); background:#fff;
     border-radius:9px; font-size:13px; font-weight:600; color:var(--mid); cursor:pointer; }
-  .tabs button.active{ background:var(--green); color:#fff; border-color:var(--green); }
-  .tabs .count{ display:inline-block; min-width:18px; padding:0 5px; border-radius:9px;
-    background:var(--amber); color:#fff; font-size:11px; margin-left:4px; }
-  .card{ background:var(--card); border:1px solid var(--line); border-radius:12px;
-    padding:14px; margin-bottom:10px; }
-  .card .top{ display:flex; justify-content:space-between; gap:8px; }
+  nav.tabs button.active{ background:var(--green); color:#fff; border-color:var(--green); }
+  /* KPI */
+  .kpis{ display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:12px; }
+  .kpi{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px; text-align:center; }
+  .kpi .n{ font-size:20px; font-weight:800; color:var(--green); }
+  .kpi .l{ font-size:10px; color:var(--mid); margin-top:2px; text-transform:uppercase; letter-spacing:.3px; }
+  @media(max-width:640px){ .kpis{ grid-template-columns:repeat(2,1fr); } }
+  /* toolbar */
+  .toolbar{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  .toolbar input, .toolbar select{ padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:13px; }
+  .toolbar input.search{ flex:1; min-width:160px; }
+  .subtabs{ display:flex; gap:6px; }
+  .subtabs button{ padding:6px 10px; border:1px solid var(--line); background:#fff; border-radius:8px;
+    font-size:12px; color:var(--mid); cursor:pointer; }
+  .subtabs button.active{ background:var(--ink); color:#fff; border-color:var(--ink); }
+  /* cards */
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:10px; }
+  .card .top{ display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
   .card .oid{ font-weight:700; font-size:14px; }
-  .card .amt{ color:var(--green); font-weight:700; }
+  .card .amt{ color:var(--green); font-weight:700; white-space:nowrap; }
   .card .cust{ font-size:14px; margin-top:2px; }
   .card .meta{ font-size:12px; color:var(--mid); margin-top:4px; line-height:1.5; }
-  .badge{ display:inline-block; font-size:11px; font-weight:700; padding:2px 8px;
-    border-radius:20px; }
-  .b-PENDING{ background:#fef3c7; color:#92400e; }
-  .b-ASSIGNED{ background:#dbeafe; color:#1e40af; }
-  .b-ON_DELIVERY{ background:#e0e7ff; color:#3730a3; }
-  .b-DELIVERED{ background:#dcfce7; color:#166534; }
+  .badge{ display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; margin-left:4px; }
+  .b-PENDING{ background:#fef3c7; color:#92400e; } .b-ASSIGNED{ background:#dbeafe; color:#1e40af; }
+  .b-ON_DELIVERY{ background:#e0e7ff; color:#3730a3; } .b-DELIVERED{ background:#dcfce7; color:#166534; }
   .b-CANCELED{ background:#fee2e2; color:#991b1b; }
-  .form{ margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);
-    display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .pill{ display:inline-block; font-size:10px; font-weight:700; padding:1px 7px; border-radius:10px; }
+  .pill-lala{ background:#fef9c3; color:#854d0e; } .pill-free{ background:#dcfce7; color:#166534; }
+  .pill-paid{ background:#dcfce7; color:#166534; } .pill-pending{ background:#fee2e2; color:#991b1b; }
+  .form{ margin-top:10px; padding-top:10px; border-top:1px dashed var(--line); display:grid;
+    grid-template-columns:1fr 1fr; gap:8px; }
   .form label{ font-size:11px; color:var(--mid); display:block; margin-bottom:2px; }
-  .form input{ width:100%; padding:8px; border:1px solid var(--line); border-radius:8px;
-    font-size:13px; }
+  .form input,.form select{ width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; font-size:13px; }
   .form .full{ grid-column:1/3; }
-  .btn{ padding:10px 14px; border:none; border-radius:9px; font-size:13px; font-weight:700;
-    cursor:pointer; }
-  .btn-green{ background:var(--green); color:#fff; }
-  .btn-wa{ background:#25d366; color:#fff; }
+  .seg{ display:flex; gap:6px; }
+  .seg button{ flex:1; padding:8px; border:1px solid var(--line); background:#fff; border-radius:8px;
+    font-size:12px; font-weight:700; cursor:pointer; color:var(--mid); }
+  .seg button.on{ background:var(--green); color:#fff; border-color:var(--green); }
+  .btn{ padding:10px 14px; border:none; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; }
+  .btn-green{ background:var(--green); color:#fff; } .btn-wa{ background:#25d366; color:#fff; }
   .btn-out{ background:#fff; color:var(--green); border:1px solid var(--green); }
+  .btn-ink{ background:var(--ink); color:#fff; } .btn-sm{ padding:6px 10px; font-size:12px; }
   .btn-row{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
   .empty{ text-align:center; color:var(--mid); padding:40px 12px; font-size:14px; }
-  .signin{ display:flex; flex-direction:column; align-items:center; gap:14px;
-    padding:60px 20px; text-align:center; }
-  .signin h2{ color:var(--green); margin:0; }
-  .toast{ position:fixed; bottom:16px; left:50%; transform:translateX(-50%);
-    background:#14241c; color:#fff; padding:10px 16px; border-radius:9px; font-size:13px;
-    opacity:0; transition:opacity .2s; z-index:50; }
-  .toast.show{ opacity:1; }
-  .sent{ font-size:11px; color:var(--green); font-weight:600; }
+  table.tbl{ width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  table.tbl th,table.tbl td{ text-align:left; padding:10px; font-size:13px; border-bottom:1px solid var(--line); }
+  table.tbl th{ background:#f0f3f1; font-size:11px; text-transform:uppercase; color:var(--mid); }
+  .signin{ display:flex; flex-direction:column; align-items:center; gap:14px; padding:60px 20px; text-align:center; }
+  .signin h2{ margin:0; }
+  .toast{ position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#14241c; color:#fff;
+    padding:10px 16px; border-radius:9px; font-size:13px; opacity:0; transition:opacity .2s; z-index:50; max-width:90vw; }
+  .toast.show{ opacity:1; } .sent{ font-size:11px; color:var(--green); font-weight:600; }
+  .modal{ position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center;
+    justify-content:center; z-index:40; padding:16px; }
+  .modal.show{ display:flex; } .modal .box{ background:#fff; border-radius:12px; padding:18px; width:420px; max-width:100%; }
+  .modal h3{ margin:0 0 12px; } .modal .field{ margin-bottom:10px; }
+  .modal label{ font-size:12px; color:var(--mid); display:block; margin-bottom:3px; }
+  .modal input,.modal select{ width:100%; padding:9px; border:1px solid var(--line); border-radius:8px; font-size:14px; }
 </style>
 </head>
 <body>
 <header>
   <div class="brand">
     <img src="logo/ezydelivery.png" alt="Ezydelivery">
-    <div>
-      <div class="name">Ezydelivery</div>
-      <div class="tag">Durian anda tanggungjawab kami</div>
-    </div>
+    <div><div class="name">Ezydelivery</div><div class="tag">Durian anda tanggungjawab kami</div></div>
   </div>
-  <span class="who" id="who"></span>
+  <div class="who" id="who"></div>
 </header>
 
 <div class="wrap">
-  <!-- Sign-in gate -->
   <div id="signinView" class="signin">
     <img src="logo/ezydelivery.png" alt="Ezydelivery" style="width:200px;max-width:70vw;height:auto">
-    <h2 style="margin:0">Ezydelivery</h2>
-    <p style="color:var(--green);font-size:14px;margin:0;font-weight:600">Durian anda tanggungjawab kami</p>
-    <p style="color:var(--mid);font-size:13px;margin:4px 0 0">Log masuk untuk urus penghantaran.</p>
+    <h2 style="color:var(--green)">Ezydelivery</h2>
+    <p style="color:var(--green);font-weight:600;margin:0">Durian anda tanggungjawab kami</p>
+    <p style="color:var(--mid);font-size:13px;margin:4px 0 0">Log masuk untuk teruskan.</p>
     <div id="gbtn"></div>
+    <p id="noAccess" style="color:#991b1b;font-size:13px;display:none">
+      Akaun anda belum diberi akses. Sila hubungi admin.</p>
   </div>
 
-  <!-- App -->
   <div id="appView" style="display:none">
-    <div class="tabs">
-      <button data-tab="PENDING"     class="active" onclick="switchTab('PENDING')">Perlu Assign <span class="count" id="c-PENDING">0</span></button>
-      <button data-tab="ON_DELIVERY"                onclick="switchTab('ON_DELIVERY')">Dalam Hantaran <span class="count" id="c-ON_DELIVERY">0</span></button>
-      <button data-tab="DELIVERED"                  onclick="switchTab('DELIVERED')">Selesai</button>
-    </div>
-    <div id="list"></div>
+    <nav class="tabs" id="nav"></nav>
+    <div id="view"></div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="modal" id="modal"><div class="box" id="modalBox"></div></div>
 
 <script>
-const CFG = DELIVERY_CONFIG;  // from configs/ezydelivery.js (bare global, like COMPANY_CONFIG)
-let ID_TOKEN = null;
-let CURRENT_TAB = 'PENDING';
-let ORDERS = [];
+const CFG = DELIVERY_CONFIG;
+let ID_TOKEN=null, ME=null, VIEW='orders';
+let ORDERS=[], RUNNERS=[], USERS=[], CLAIMS=[];
+let F={ q:'', status:'', today:false }; // order filters
+let CLAIM_TAB='pending';
 
-// ---- Google Sign-In --------------------------------------------------
+// ---- Sign-in ----
 window.onload = () => {
-  if (!window.google || !google.accounts) { setTimeout(window.onload, 300); return; }
-  google.accounts.id.initialize({ client_id: CFG.clientId, callback: onCredential });
+  if(!window.google||!google.accounts){ setTimeout(window.onload,300); return; }
+  google.accounts.id.initialize({ client_id:CFG.clientId, callback:onCredential });
   google.accounts.id.renderButton(document.getElementById('gbtn'),
     { theme:'filled_green', size:'large', text:'signin_with', shape:'pill' });
 };
-
-function onCredential(res){
-  ID_TOKEN = res.credential;
-  const p = JSON.parse(atob(ID_TOKEN.split('.')[1]));
-  document.getElementById('who').textContent = p.email || '';
-  document.getElementById('signinView').style.display = 'none';
-  document.getElementById('appView').style.display = 'block';
-  loadOrders();
+async function onCredential(res){
+  ID_TOKEN=res.credential;
+  try{
+    const { user } = await api('/me');
+    ME=user;
+    document.getElementById('signinView').style.display='none';
+    document.getElementById('appView').style.display='block';
+    renderWho(); buildNav();
+    VIEW = ME.role==='runner' ? 'myjobs' : (ME.role==='account' ? 'claims' : 'orders');
+    loadView();
+  }catch(e){
+    if(String(e.message).includes('401')) document.getElementById('noAccess').style.display='block';
+    else toast('Ralat: '+e.message);
+  }
+}
+function logout(){ location.reload(); }
+function renderWho(){
+  document.getElementById('who').innerHTML =
+    `${ME.email}<br><span class="role">${ME.role}</span> · <a onclick="logout()">Log keluar</a>`;
 }
 
-// ---- API -------------------------------------------------------------
+// ---- API ----
 async function api(path, opts={}){
-  const r = await fetch(CFG.workerUrl + path, {
-    ...opts,
-    headers: { 'Content-Type':'application/json',
-               'Authorization':'Bearer ' + ID_TOKEN, ...(opts.headers||{}) },
-  });
-  if (r.status === 401){ toast('Sesi tamat — log masuk semula'); throw new Error('401'); }
-  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const r = await fetch(CFG.workerUrl+path, { ...opts,
+    headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+ID_TOKEN, ...(opts.headers||{}) }});
+  if(r.status===401) throw new Error('401');
+  if(r.status===403){ toast('Tiada kebenaran'); throw new Error('403'); }
+  if(!r.ok) throw new Error('HTTP '+r.status);
   return r.json();
 }
 
+// ---- Nav ----
+function buildNav(){
+  const items=[];
+  if(ME.role==='admin'||ME.role==='staff') items.push(['orders','Order']);
+  if(ME.role==='admin') items.push(['runners','Runner'],['users','Pengguna']);
+  if(ME.role==='admin'||ME.role==='account') items.push(['claims','Claim']);
+  if(ME.role==='runner') items.push(['myjobs','Hantaran Saya']);
+  document.getElementById('nav').innerHTML = items.map(([k,l])=>
+    `<button data-v="${k}" class="${k===VIEW?'active':''}" onclick="go('${k}')">${l}</button>`).join('');
+}
+function go(v){ VIEW=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v)); loadView(); }
+
+async function loadView(){
+  const el=document.getElementById('view'); el.innerHTML='<div class="empty">Memuatkan…</div>';
+  try{
+    if(VIEW==='orders'){ await Promise.all([loadOrders(), loadRunners().catch(()=>{})]); renderOrders(); }
+    else if(VIEW==='myjobs'){ await loadOrders(); renderOrders(); }
+    else if(VIEW==='runners'){ await loadRunners(); renderRunners(); }
+    else if(VIEW==='users'){ await Promise.all([loadUsers(),loadRunners()]); renderUsers(); }
+    else if(VIEW==='claims'){ await loadClaims(); renderClaims(); }
+  }catch(e){ el.innerHTML='<div class="empty">Gagal muat: '+e.message+'</div>'; }
+}
+
+// ==== ORDERS ====
 async function loadOrders(){
-  try {
-    const { orders } = await api('/orders');
-    ORDERS = orders || [];
-    render();
-  } catch(e){ toast('Gagal muat: ' + e.message); }
+  const p=new URLSearchParams();
+  if(F.q) p.set('q',F.q);
+  if(F.status) p.set('status',F.status);
+  if(F.today){ p.set('from', new Date().toISOString().slice(0,10)); }
+  const { orders } = await api('/orders'+(p.toString()?'?'+p:'' ));
+  ORDERS=orders||[];
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function productLine(o){ return (o.products||[]).map(p=>`${esc(p.name)}${p.qty?' ×'+p.qty:''}`).join(', '); }
+function runnerLabel(o){ return o.delivery_type==='lalamove' ? '' : (o.runner_name||''); }
+
+function renderOrders(){
+  const el=document.getElementById('view');
+  const isMy = VIEW==='myjobs';
+  let html='';
+  if(!isMy){
+    // KPI
+    const today=new Date().toISOString().slice(0,10);
+    const t=ORDERS.filter(o=>(o.created_at||'').slice(0,10)===today);
+    const k=(n,l)=>`<div class="kpi"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+    html+=`<div class="kpis">
+      ${k(t.length,'Order Hari Ni')}
+      ${k(ORDERS.filter(o=>o.status==='PENDING').length,'Belum Assign')}
+      ${k(ORDERS.filter(o=>o.status==='ASSIGNED'||o.status==='ON_DELIVERY').length,'Dalam Hantaran')}
+      ${k(ORDERS.filter(o=>o.status==='DELIVERED').length,'Selesai')}
+      ${k('RM'+t.reduce((s,o)=>s+(+o.total_amount||0),0).toFixed(0),'Jualan Hari Ni')}
+    </div>`;
+    html+=`<div class="toolbar">
+      <input class="search" id="q" placeholder="Cari nama / telefon / order ID" value="${esc(F.q)}" onkeydown="if(event.key==='Enter')applyFilter()">
+      <select id="st" onchange="applyFilter()">
+        <option value="">Semua status</option>
+        <option value="PENDING">Belum assign</option>
+        <option value="ASSIGNED">Assigned</option>
+        <option value="ON_DELIVERY">Dalam hantaran</option>
+        <option value="DELIVERED">Selesai</option>
+        <option value="CANCELED">Batal</option>
+      </select>
+      <label style="font-size:12px;color:var(--mid)"><input type="checkbox" id="td" ${F.today?'checked':''} onchange="applyFilter()"> Hari ni</label>
+      <button class="btn btn-ink btn-sm" onclick="openManual()">+ Order Manual</button>
+    </div>`;
+  }
+  const rows = ORDERS;
+  html += rows.length ? rows.map(o=>cardHTML(o,isMy)).join('') : '<div class="empty">Tiada order.</div>';
+  el.innerHTML=html;
+  if(!isMy){ const st=document.getElementById('st'); if(st) st.value=F.status; }
+}
+function applyFilter(){
+  F.q=(document.getElementById('q')||{}).value||'';
+  F.status=(document.getElementById('st')||{}).value||'';
+  F.today=(document.getElementById('td')||{}).checked||false;
+  loadOrders().then(renderOrders).catch(e=>toast(e.message));
 }
 
-// ---- Render ----------------------------------------------------------
-function switchTab(tab){
-  CURRENT_TAB = tab;
-  document.querySelectorAll('.tabs button').forEach(b =>
-    b.classList.toggle('active', b.dataset.tab === tab));
-  render();
-}
-
-function ordersFor(tab){
-  if (tab === 'PENDING')      return ORDERS.filter(o => o.status === 'PENDING');
-  if (tab === 'ON_DELIVERY')  return ORDERS.filter(o => o.status === 'ASSIGNED' || o.status === 'ON_DELIVERY');
-  return ORDERS.filter(o => o.status === 'DELIVERED');
-}
-
-function render(){
-  document.getElementById('c-PENDING').textContent = ordersFor('PENDING').length;
-  document.getElementById('c-ON_DELIVERY').textContent = ordersFor('ON_DELIVERY').length;
-
-  const rows = ordersFor(CURRENT_TAB);
-  const list = document.getElementById('list');
-  if (!rows.length){ list.innerHTML = '<div class="empty">Tiada order di sini.</div>'; return; }
-  list.innerHTML = rows.map(cardHTML).join('');
-}
-
-function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,
-  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-
-function productLine(o){
-  return (o.products||[]).map(p => `${esc(p.name)}${p.qty?' ×'+p.qty:''}`).join(', ');
-}
-
-function cardHTML(o){
-  const prod = productLine(o);
-  let actions = '';
-
-  if (o.status === 'PENDING'){
-    const dl = CFG.runners.map(r => `<option value="${esc(r)}">`).join('');
-    actions = `
-      <div class="form">
-        <div><label>Runner</label>
-          <input list="runners-${esc(o.order_id)}" id="run-${esc(o.order_id)}" placeholder="Nama runner">
-          <datalist id="runners-${esc(o.order_id)}">${dl}</datalist></div>
-        <div><label>Tracking</label><input id="trk-${esc(o.order_id)}" placeholder="cth EZ123456"></div>
-        <div><label>Anggaran tiba</label><input id="eta-${esc(o.order_id)}" placeholder="cth 3:00 PM"></div>
-        <div><label>Remark</label><input id="rmk-${esc(o.order_id)}" placeholder="pilihan"></div>
-        <div class="btn-row full">
-          <button class="btn btn-green" onclick="assign('${esc(o.order_id)}')">Simpan & Sedia Hantar</button>
-        </div>
-      </div>`;
-  } else if (o.status === 'ASSIGNED'){
-    actions = `
-      <div class="meta">Runner: <b>${esc(o.runner)}</b>${o.tracking?' · '+esc(o.tracking):''}${o.est_time?' · '+esc(o.est_time):''}</div>
+function cardHTML(o, isMy){
+  const prod=productLine(o), rl=runnerLabel(o);
+  const dpill = o.delivery_type==='lalamove' ? '<span class="pill pill-lala">LALAMOVE</span>'
+              : o.delivery_type==='freelance' ? '<span class="pill pill-free">FREELANCE</span>' : '';
+  const claimPill = o.claim_amount!=null ?
+     ` <span class="pill pill-${o.claim_status==='paid'?'paid':'pending'}">Claim RM${(+o.claim_amount).toFixed(2)} ${o.claim_status==='paid'?'✓':''}</span>`:'';
+  let actions='';
+  if(!isMy){
+    if(o.status==='PENDING') actions=assignForm(o);
+    else if(o.status==='ASSIGNED') actions=`
+      <div class="meta">${rl?'Runner: <b>'+esc(rl)+'</b> · ':''}${o.tracking?esc(o.tracking)+' · ':''}${esc(o.est_time||'')}</div>
       <div class="btn-row">
-        <button class="btn btn-wa" onclick="sendWA('${esc(o.order_id)}',1)">Hantar WA #1 (Dalam hantaran)</button>
+        <button class="btn btn-wa" onclick="sendWA('${esc(o.order_id)}',1)">Hantar WA #1</button>
+        <button class="btn btn-out btn-sm" onclick="openEdit('${esc(o.order_id)}')">Edit</button>
       </div>`;
-  } else if (o.status === 'ON_DELIVERY'){
-    actions = `
-      <div class="meta">Runner: <b>${esc(o.runner)}</b>${o.tracking?' · '+esc(o.tracking):''}
-        ${o.wa1_sent_at?'<span class="sent"> ✓ WA#1 dihantar</span>':''}</div>
+    else if(o.status==='ON_DELIVERY') actions=`
+      <div class="meta">${rl?'Runner: <b>'+esc(rl)+'</b>':''} ${o.wa1_sent_at?'<span class="sent">✓ WA#1</span>':''}</div>
       <div class="btn-row">
-        <button class="btn btn-out" onclick="sendWA('${esc(o.order_id)}',1)">Hantar WA #1 semula</button>
+        <button class="btn btn-out btn-sm" onclick="sendWA('${esc(o.order_id)}',1)">WA #1 semula</button>
         <button class="btn btn-green" onclick="markDelivered('${esc(o.order_id)}')">Tandakan Selesai</button>
       </div>`;
-  } else if (o.status === 'DELIVERED'){
-    actions = `
-      <div class="meta">Runner: <b>${esc(o.runner)}</b>
-        ${o.wa2_sent_at?'<span class="sent"> ✓ WA#2 dihantar</span>':''}</div>
-      <div class="btn-row">
-        <button class="btn btn-wa" onclick="sendWA('${esc(o.order_id)}',2)">Hantar WA #2 (Selesai)</button>
-      </div>`;
+    else if(o.status==='DELIVERED') actions=`
+      <div class="meta">${rl?'Runner: <b>'+esc(rl)+'</b>':''} ${o.wa2_sent_at?'<span class="sent">✓ WA#2</span>':''}</div>
+      <div class="btn-row"><button class="btn btn-wa" onclick="sendWA('${esc(o.order_id)}',2)">Hantar WA #2</button></div>`;
+  } else {
+    actions=`<div class="meta">${o.tracking?'Tracking: '+esc(o.tracking):''} ${o.est_time?'· '+esc(o.est_time):''}</div>`;
   }
-
-  return `
-    <div class="card">
-      <div class="top">
-        <div>
-          <span class="oid">#${esc(o.order_id)}</span>
-          <span class="badge b-${o.status}">${o.status}</span>
-        </div>
-        <span class="amt">RM${Number(o.total_amount||0).toFixed(2)}</span>
-      </div>
-      <div class="cust">${esc(o.customer_name)} · ${esc(o.phone)}</div>
-      <div class="meta">${prod?prod+'<br>':''}${esc(o.address)}</div>
-      ${actions}
-    </div>`;
+  return `<div class="card">
+    <div class="top">
+      <div><span class="oid">#${esc(o.order_id)}</span><span class="badge b-${o.status}">${o.status}</span> ${dpill}${claimPill}</div>
+      <span class="amt">RM${(+o.total_amount||0).toFixed(2)}</span>
+    </div>
+    <div class="cust">${esc(o.customer_name)} · ${esc(o.phone)}</div>
+    <div class="meta">${prod?prod+'<br>':''}${esc(o.address)}</div>
+    ${actions}</div>`;
 }
 
-// ---- Actions ---------------------------------------------------------
+function assignForm(o){
+  const id=esc(o.order_id);
+  const opts=RUNNERS.filter(r=>r.active).map(r=>`<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('');
+  return `<div class="form" id="f-${id}">
+    <div class="full"><label>Jenis penghantaran</label>
+      <div class="seg">
+        <button type="button" class="on" id="dt-free-${id}" onclick="pickType('${id}','freelance')">Runner Freelance</button>
+        <button type="button" id="dt-lala-${id}" onclick="pickType('${id}','lalamove')">Lalamove</button>
+      </div></div>
+    <div id="freeBox-${id}"><label>Runner</label>
+      <select id="run-${id}">${opts||'<option value="">(tiada runner — tambah dulu)</option>'}</select></div>
+    <div id="claimBox-${id}"><label>Claim runner (RM)</label>
+      <input id="clm-${id}" type="number" step="0.50" placeholder="cth 10.00"></div>
+    <div><label>Tracking</label><input id="trk-${id}" placeholder="pilihan"></div>
+    <div><label>Anggaran tiba</label><input id="eta-${id}" placeholder="cth 3:00 PM"></div>
+    <div class="full"><label>Remark</label><input id="rmk-${id}" placeholder="pilihan"></div>
+    <input type="hidden" id="dtype-${id}" value="freelance">
+    <div class="btn-row full"><button class="btn btn-green" onclick="assign('${id}')">Simpan & Sedia Hantar</button></div>
+  </div>`;
+}
+function pickType(id,t){
+  document.getElementById('dtype-'+id).value=t;
+  document.getElementById('dt-free-'+id).classList.toggle('on',t==='freelance');
+  document.getElementById('dt-lala-'+id).classList.toggle('on',t==='lalamove');
+  const show=t==='freelance'?'':'none';
+  document.getElementById('freeBox-'+id).style.display=show;
+  document.getElementById('claimBox-'+id).style.display=show;
+}
 async function assign(id){
-  const g = s => (document.getElementById(s+'-'+id)||{}).value || '';
-  const runner = g('run').trim();
-  if (!runner){ toast('Isi nama runner dulu'); return; }
-  try {
-    await api(`/orders/${encodeURIComponent(id)}/assign`, {
-      method:'POST',
-      body: JSON.stringify({ runner, tracking:g('trk').trim(),
-        est_time:g('eta').trim(), remark:g('rmk').trim() }),
-    });
-    const o = ORDERS.find(x => x.order_id === id);
-    if (o){ o.runner=runner; o.tracking=g('trk').trim(); o.est_time=g('eta').trim();
-            o.remark=g('rmk').trim(); o.status='ASSIGNED'; }
-    toast('Disimpan'); render();
-  } catch(e){ toast('Gagal: ' + e.message); }
+  const g=s=>(document.getElementById(s+'-'+id)||{}).value||'';
+  const dtype=g('dtype');
+  const body={ delivery_type:dtype, tracking:g('trk').trim(), est_time:g('eta').trim(), remark:g('rmk').trim() };
+  if(dtype==='freelance'){
+    if(!g('run')){ toast('Pilih runner dulu'); return; }
+    body.runner_id=g('run'); body.claim_amount=g('clm')?Number(g('clm')):null;
+  }
+  try{ await api(`/orders/${encodeURIComponent(id)}/assign`,{method:'POST',body:JSON.stringify(body)});
+    toast('Disimpan'); await loadOrders(); renderOrders();
+  }catch(e){ toast('Gagal: '+e.message); }
 }
-
-// Build wa.me link from the DECOUPLED template and open it. We only assume
-// the message is sent (wa.me gives no delivery receipt) once staff taps.
 async function sendWA(id, which){
-  const o = ORDERS.find(x => x.order_id === id);
-  if (!o) return;
-  if (!o.phone){ toast('Tiada nombor telefon'); return; }
-  const tmpl = which === 1 ? CFG.waTemplates.onDelivery : CFG.waTemplates.delivered;
-  const url = `https://wa.me/${o.phone}?text=${encodeURIComponent(tmpl(o))}`;
-  window.open(url, '_blank');
-  try {
-    const body = which === 1 ? { status:'ON_DELIVERY', wa:'wa1' } : { wa:'wa2' };
-    await api(`/orders/${encodeURIComponent(id)}/status`, { method:'POST', body:JSON.stringify(body) });
-    if (which === 1){ o.status='ON_DELIVERY'; o.wa1_sent_at=new Date().toISOString(); }
-    else { o.wa2_sent_at=new Date().toISOString(); }
-    render();
-  } catch(e){ toast('Status tak dikemaskini: ' + e.message); }
+  const o=ORDERS.find(x=>x.order_id===id); if(!o) return;
+  if(!o.phone){ toast('Tiada telefon'); return; }
+  const disp={ ...o, runner:runnerLabel(o) };
+  const tmpl=which===1?CFG.waTemplates.onDelivery:CFG.waTemplates.delivered;
+  window.open(`https://wa.me/${o.phone}?text=${encodeURIComponent(tmpl(disp))}`,'_blank');
+  try{ const body=which===1?{status:'ON_DELIVERY',wa:'wa1'}:{wa:'wa2'};
+    await api(`/orders/${encodeURIComponent(id)}/status`,{method:'POST',body:JSON.stringify(body)});
+    await loadOrders(); renderOrders();
+  }catch(e){ toast('Status tak dikemaskini: '+e.message); }
 }
-
 async function markDelivered(id){
-  try {
-    await api(`/orders/${encodeURIComponent(id)}/status`, {
-      method:'POST', body: JSON.stringify({ status:'DELIVERED' }) });
-    const o = ORDERS.find(x => x.order_id === id);
-    if (o) o.status = 'DELIVERED';
-    toast('Selesai — jangan lupa hantar WA #2'); render();
-  } catch(e){ toast('Gagal: ' + e.message); }
+  try{ await api(`/orders/${encodeURIComponent(id)}/status`,{method:'POST',body:JSON.stringify({status:'DELIVERED'})});
+    toast('Selesai — hantar WA #2'); await loadOrders(); renderOrders();
+  }catch(e){ toast('Gagal: '+e.message); }
 }
 
-// ---- UI helpers ------------------------------------------------------
-let toastT;
-function toast(msg){
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600);
+// ==== EDIT / MANUAL (modal) ====
+function showModal(html){ document.getElementById('modalBox').innerHTML=html; document.getElementById('modal').classList.add('show'); }
+function closeModal(){ document.getElementById('modal').classList.remove('show'); }
+function openEdit(id){
+  const o=ORDERS.find(x=>x.order_id===id); if(!o) return;
+  showModal(`<h3>Edit Order #${esc(id)}</h3>
+    <div class="field"><label>Nama</label><input id="e-name" value="${esc(o.customer_name)}"></div>
+    <div class="field"><label>Telefon</label><input id="e-phone" value="${esc(o.phone)}"></div>
+    <div class="field"><label>Alamat</label><input id="e-addr" value="${esc(o.address)}"></div>
+    <div class="btn-row"><button class="btn btn-green" onclick="saveEdit('${esc(id)}')">Simpan</button>
+      <button class="btn btn-out" onclick="closeModal()">Batal</button></div>`);
 }
+async function saveEdit(id){
+  const v=s=>document.getElementById(s).value;
+  try{ await api(`/orders/${encodeURIComponent(id)}/edit`,{method:'POST',
+    body:JSON.stringify({customer_name:v('e-name'),phone:v('e-phone'),address:v('e-addr')})});
+    closeModal(); toast('Dikemaskini'); await loadOrders(); renderOrders();
+  }catch(e){ toast('Gagal: '+e.message); }
+}
+function openManual(){
+  showModal(`<h3>Order Manual</h3>
+    <div class="field"><label>Nama *</label><input id="m-name"></div>
+    <div class="field"><label>Telefon *</label><input id="m-phone" placeholder="cth 0123456789"></div>
+    <div class="field"><label>Alamat</label><input id="m-addr"></div>
+    <div class="field"><label>Produk (cth: Musang King 1kg x2)</label><input id="m-prod"></div>
+    <div class="field"><label>Jumlah (RM)</label><input id="m-amt" type="number" step="0.50"></div>
+    <div class="btn-row"><button class="btn btn-green" onclick="saveManual()">Cipta</button>
+      <button class="btn btn-out" onclick="closeModal()">Batal</button></div>`);
+}
+async function saveManual(){
+  const v=s=>document.getElementById(s).value;
+  const prods = v('m-prod').trim() ? [{name:v('m-prod').trim(),qty:1}] : [];
+  try{ await api('/orders',{method:'POST',body:JSON.stringify({
+      customer_name:v('m-name'),phone:v('m-phone'),address:v('m-addr'),
+      products:prods, total_amount:v('m-amt')||0 })});
+    closeModal(); toast('Order dicipta'); await loadOrders(); renderOrders();
+  }catch(e){ toast('Gagal: '+e.message); }
+}
+
+// ==== RUNNERS ====
+async function loadRunners(){ const {runners}=await api('/runners'); RUNNERS=runners||[]; }
+function renderRunners(){
+  const el=document.getElementById('view');
+  el.innerHTML=`
+    <div class="toolbar"><button class="btn btn-ink btn-sm" onclick="openRunner()">+ Tambah Runner</button></div>
+    <table class="tbl"><thead><tr><th>Nama</th><th>Telefon</th><th>Login (email)</th><th>Status</th><th></th></tr></thead>
+    <tbody>${RUNNERS.map(r=>`<tr>
+      <td>${esc(r.name)}</td><td>${esc(r.phone||'')}</td><td>${esc(r.email||'—')}</td>
+      <td>${r.active?'<span class="pill pill-free">Aktif</span>':'<span class="pill pill-pending">Nyahaktif</span>'}</td>
+      <td><button class="btn btn-out btn-sm" onclick="toggleRunner('${esc(r.id)}',${r.active?0:1})">${r.active?'Nyahaktif':'Aktifkan'}</button></td>
+    </tr>`).join('')||'<tr><td colspan=5 class="empty">Tiada runner.</td></tr>'}</tbody></table>`;
+}
+function openRunner(){
+  showModal(`<h3>Tambah Runner Freelance</h3>
+    <div class="field"><label>Nama *</label><input id="r-name"></div>
+    <div class="field"><label>Telefon</label><input id="r-phone"></div>
+    <div class="field"><label>Email Google (jika nak bagi login)</label><input id="r-email" placeholder="pilihan"></div>
+    <div class="btn-row"><button class="btn btn-green" onclick="saveRunner()">Simpan</button>
+      <button class="btn btn-out" onclick="closeModal()">Batal</button></div>`);
+}
+async function saveRunner(){
+  const v=s=>document.getElementById(s).value;
+  if(!v('r-name').trim()){ toast('Nama wajib'); return; }
+  try{ await api('/runners',{method:'POST',body:JSON.stringify({name:v('r-name').trim(),phone:v('r-phone').trim(),email:v('r-email').trim()})});
+    closeModal(); toast('Runner ditambah'); await loadRunners(); renderRunners();
+  }catch(e){ toast('Gagal: '+e.message); }
+}
+async function toggleRunner(id,active){
+  try{ await api(`/runners/${encodeURIComponent(id)}`,{method:'POST',body:JSON.stringify({active})});
+    await loadRunners(); renderRunners();
+  }catch(e){ toast('Gagal: '+e.message); }
+}
+
+// ==== USERS ====
+async function loadUsers(){ const {users}=await api('/users'); USERS=users||[]; }
+function renderUsers(){
+  const el=document.getElementById('view');
+  el.innerHTML=`
+    <div class="toolbar"><button class="btn btn-ink btn-sm" onclick="openUser()">+ Beri Akses</button></div>
+    <table class="tbl"><thead><tr><th>Email</th><th>Role</th><th>Runner</th><th>Status</th><th></th></tr></thead>
+    <tbody>${USERS.map(u=>`<tr>
+      <td>${esc(u.email)}</td><td><span class="pill pill-free">${esc(u.role)}</span></td>
+      <td>${esc(u.runner_name||'—')}</td>
+      <td>${u.active?'Aktif':'Nyahaktif'}</td>
+      <td>${u.email==='keyrooll@gmail.com'?'':`<button class="btn btn-out btn-sm" onclick="toggleUser('${esc(u.email)}',${u.active?0:1})">${u.active?'Nyahaktif':'Aktifkan'}</button>`}</td>
+    </tr>`).join('')}</tbody></table>`;
+}
+function openUser(){
+  const runOpts=RUNNERS.filter(r=>r.active).map(r=>`<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('');
+  showModal(`<h3>Beri Akses Pengguna</h3>
+    <div class="field"><label>Email Google *</label><input id="u-email"></div>
+    <div class="field"><label>Role *</label>
+      <select id="u-role" onchange="document.getElementById('u-runbox').style.display=this.value==='runner'?'':'none'">
+        <option value="staff">Staff</option><option value="account">Account</option>
+        <option value="admin">Admin</option><option value="runner">Runner</option>
+      </select></div>
+    <div class="field" id="u-runbox" style="display:none"><label>Pautkan ke runner</label>
+      <select id="u-runner">${runOpts}</select></div>
+    <div class="btn-row"><button class="btn btn-green" onclick="saveUser()">Simpan</button>
+      <button class="btn btn-out" onclick="closeModal()">Batal</button></div>`);
+}
+async function saveUser(){
+  const v=s=>document.getElementById(s).value;
+  if(!v('u-email').trim()){ toast('Email wajib'); return; }
+  const body={ email:v('u-email').trim(), role:v('u-role') };
+  if(v('u-role')==='runner') body.runner_id=v('u-runner');
+  try{ await api('/users',{method:'POST',body:JSON.stringify(body)});
+    closeModal(); toast('Akses diberi'); await loadUsers(); renderUsers();
+  }catch(e){ toast('Gagal: '+e.message); }
+}
+async function toggleUser(email,active){
+  try{ await api(`/users/${encodeURIComponent(email)}`,{method:'POST',body:JSON.stringify({active})});
+    await loadUsers(); renderUsers();
+  }catch(e){ toast('Gagal: '+e.message); }
+}
+
+// ==== CLAIMS ====
+async function loadClaims(){ const {claims}=await api('/claims?status='+CLAIM_TAB); CLAIMS=claims||[]; }
+function renderClaims(){
+  const el=document.getElementById('view');
+  // group by runner
+  const groups={};
+  CLAIMS.forEach(c=>{ const k=c.runner_name||'(tiada runner)'; (groups[k]=groups[k]||[]).push(c); });
+  const tab=(k,l)=>`<button class="${CLAIM_TAB===k?'active':''}" onclick="CLAIM_TAB='${k}';loadClaims().then(renderClaims)">${l}</button>`;
+  let html=`<div class="subtabs" style="margin-bottom:12px">${tab('pending','Belum Bayar')}${tab('paid','Dah Bayar')}${tab('all','Semua')}</div>`;
+  const runners=Object.keys(groups);
+  if(!runners.length){ html+='<div class="empty">Tiada claim.</div>'; el.innerHTML=html; return; }
+  runners.forEach(rn=>{
+    const list=groups[rn]; const total=list.reduce((s,c)=>s+(+c.claim_amount||0),0);
+    html+=`<div class="card"><div class="top">
+      <div class="oid">${esc(rn)}</div>
+      <div class="amt">RM${total.toFixed(2)}${CLAIM_TAB==='pending'&&(ME.role==='admin'||ME.role==='account')?
+        ` <button class="btn btn-green btn-sm" onclick="payRunner('${esc(rn)}')">Tandakan Dah Bayar</button>`:''}</div>
+    </div>
+    <table class="tbl" style="margin-top:8px"><tbody>${list.map(c=>`<tr>
+      <td>#${esc(c.order_id)}</td><td>${esc(c.customer_name)}</td>
+      <td>RM${(+c.claim_amount).toFixed(2)}</td>
+      <td><span class="pill pill-${c.claim_status==='paid'?'paid':'pending'}">${c.claim_status}</span></td>
+    </tr>`).join('')}</tbody></table></div>`;
+  });
+  el.innerHTML=html;
+}
+async function payRunner(runnerName){
+  const ids=CLAIMS.filter(c=>(c.runner_name||'(tiada runner)')===runnerName && c.claim_status==='pending').map(c=>c.order_id);
+  if(!ids.length) return;
+  if(!confirm(`Tandakan ${ids.length} claim ${runnerName} sebagai DAH BAYAR?`)) return;
+  try{ await api('/claims/pay',{method:'POST',body:JSON.stringify({order_ids:ids})});
+    toast('Ditanda dibayar'); await loadClaims(); renderClaims();
+  }catch(e){ toast('Gagal: '+e.message); }
+}
+
+// ---- toast ----
+let tT; function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show');
+  clearTimeout(tT); tT=setTimeout(()=>t.classList.remove('show'),2600); }
 </script>
 </body>
 </html>

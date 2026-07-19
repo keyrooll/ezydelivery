@@ -15,20 +15,20 @@ const DELIVERY_CONFIG = {
   // ezydelivery-worker base URL (no trailing slash). Set after first deploy.
   workerUrl: 'https://ezydelivery.keyrooll.workers.dev',
 
-  // Common runner names for the assign dropdown (still free-typeable).
-  runners: ['Ali', 'Din', 'Joe', 'Azim'],
+  // (Runner list now comes from D1 via /runners — no static list here.)
 
   // ---- Message templates -------------------------------------------------
   // THE SENDER IS DECOUPLED FROM THESE. Today they are turned into wa.me
   // links (staff taps send). If you later move to the WhatsApp API, only the
   // sender changes — these templates stay identical.
+  // `o.runner` is a display label (freelance runner name; empty for Lalamove).
   waTemplates: {
     // Message #1 — sent when a runner is assigned / out for delivery.
     onDelivery: (o) =>
 `Assalamualaikum ${o.customer_name}.
 
-Tempahan durian anda sedang dalam penghantaran.
-Runner: ${o.runner}${o.tracking ? `
+Tempahan durian anda sedang dalam penghantaran.${o.runner ? `
+Runner: ${o.runner}` : ''}${o.tracking ? `
 Tracking: ${o.tracking}` : ''}${o.est_time ? `
 Anggaran tiba: ${o.est_time}` : ''}
 
