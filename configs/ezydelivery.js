@@ -1,0 +1,45 @@
+// =====================
+// EZY DELIVERY CONFIG
+// =====================
+// Delivery / customer-management module for EzyDurian.
+// Data lives in Cloudflare D1 (via ezydelivery-worker), NOT Google Sheets.
+const DELIVERY_CONFIG = {
+  id: 'ezydelivery',
+  name: 'EzyDurian Delivery',
+  shortName: 'EzyDelivery',
+  themeColor: '#1a7a4a',
+
+  // Google Sign-In — identifies staff. Worker checks the email allowlist.
+  clientId: '27154479564-ufljm52nmlh4gg7ie54knphff44jvrrq.apps.googleusercontent.com',
+
+  // ezydelivery-worker base URL (no trailing slash). Set after first deploy.
+  workerUrl: 'https://ezydelivery.keyrooll.workers.dev',
+
+  // Common runner names for the assign dropdown (still free-typeable).
+  runners: ['Ali', 'Din', 'Joe', 'Azim'],
+
+  // ---- Message templates -------------------------------------------------
+  // THE SENDER IS DECOUPLED FROM THESE. Today they are turned into wa.me
+  // links (staff taps send). If you later move to the WhatsApp API, only the
+  // sender changes — these templates stay identical.
+  waTemplates: {
+    // Message #1 — sent when a runner is assigned / out for delivery.
+    onDelivery: (o) =>
+`Assalamualaikum ${o.customer_name}.
+
+Tempahan durian anda sedang dalam penghantaran.
+Runner: ${o.runner}${o.tracking ? `
+Tracking: ${o.tracking}` : ''}${o.est_time ? `
+Anggaran tiba: ${o.est_time}` : ''}
+
+Terima kasih kerana memilih EzyDurian.`,
+
+    // Message #2 — sent when the order is marked delivered.
+    delivered: (o) =>
+`Assalamualaikum ${o.customer_name}.
+
+Tempahan durian anda telah selamat sampai. Semoga berpuas hati!
+
+Terima kasih kerana memilih EzyDurian. 🌱`,
+  },
+};

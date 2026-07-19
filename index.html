@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ezydelivery — Durian anda tanggungjawab kami</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="configs/ezydelivery.js"></script>
+<style>
+  :root{ --green:#1a7a4a; --green2:#2d9e62; --bg:#f4f6f5; --card:#fff;
+         --line:#e3e8e5; --mid:#6b7280; --ink:#14241c; --amber:#f59e0b; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+        background:var(--bg); color:var(--ink); }
+  header{ background:var(--green); color:#fff; padding:10px 16px; display:flex;
+          align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10; }
+  header .brand{ display:flex; align-items:center; gap:10px; }
+  header .brand img{ height:38px; width:38px; border-radius:9px; background:#fff; padding:3px; object-fit:contain; }
+  header .brand .name{ font-size:16px; font-weight:800; line-height:1.1; }
+  header .brand .tag{ font-size:10px; opacity:.85; font-weight:500; }
+  header .who{ font-size:12px; opacity:.85; }
+  .wrap{ max-width:900px; margin:0 auto; padding:12px; }
+  .tabs{ display:flex; gap:6px; margin:6px 0 12px; }
+  .tabs button{ flex:1; padding:9px; border:1px solid var(--line); background:#fff;
+    border-radius:9px; font-size:13px; font-weight:600; color:var(--mid); cursor:pointer; }
+  .tabs button.active{ background:var(--green); color:#fff; border-color:var(--green); }
+  .tabs .count{ display:inline-block; min-width:18px; padding:0 5px; border-radius:9px;
+    background:var(--amber); color:#fff; font-size:11px; margin-left:4px; }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:14px; margin-bottom:10px; }
+  .card .top{ display:flex; justify-content:space-between; gap:8px; }
+  .card .oid{ font-weight:700; font-size:14px; }
+  .card .amt{ color:var(--green); font-weight:700; }
+  .card .cust{ font-size:14px; margin-top:2px; }
+  .card .meta{ font-size:12px; color:var(--mid); margin-top:4px; line-height:1.5; }
+  .badge{ display:inline-block; font-size:11px; font-weight:700; padding:2px 8px;
+    border-radius:20px; }
+  .b-PENDING{ background:#fef3c7; color:#92400e; }
+  .b-ASSIGNED{ background:#dbeafe; color:#1e40af; }
+  .b-ON_DELIVERY{ background:#e0e7ff; color:#3730a3; }
+  .b-DELIVERED{ background:#dcfce7; color:#166534; }
+  .b-CANCELED{ background:#fee2e2; color:#991b1b; }
+  .form{ margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);
+    display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .form label{ font-size:11px; color:var(--mid); display:block; margin-bottom:2px; }
+  .form input{ width:100%; padding:8px; border:1px solid var(--line); border-radius:8px;
+    font-size:13px; }
+  .form .full{ grid-column:1/3; }
+  .btn{ padding:10px 14px; border:none; border-radius:9px; font-size:13px; font-weight:700;
+    cursor:pointer; }
+  .btn-green{ background:var(--green); color:#fff; }
+  .btn-wa{ background:#25d366; color:#fff; }
+  .btn-out{ background:#fff; color:var(--green); border:1px solid var(--green); }
+  .btn-row{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  .empty{ text-align:center; color:var(--mid); padding:40px 12px; font-size:14px; }
+  .signin{ display:flex; flex-direction:column; align-items:center; gap:14px;
+    padding:60px 20px; text-align:center; }
+  .signin h2{ color:var(--green); margin:0; }
+  .toast{ position:fixed; bottom:16px; left:50%; transform:translateX(-50%);
+    background:#14241c; color:#fff; padding:10px 16px; border-radius:9px; font-size:13px;
+    opacity:0; transition:opacity .2s; z-index:50; }
+  .toast.show{ opacity:1; }
+  .sent{ font-size:11px; color:var(--green); font-weight:600; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <img src="logo/ezydelivery.png" alt="Ezydelivery">
+    <div>
+      <div class="name">Ezydelivery</div>
+      <div class="tag">Durian anda tanggungjawab kami</div>
+    </div>
+  </div>
+  <span class="who" id="who"></span>
+</header>
+
+<div class="wrap">
+  <!-- Sign-in gate -->
+  <div id="signinView" class="signin">
+    <img src="logo/ezydelivery.png" alt="Ezydelivery" style="width:200px;max-width:70vw;height:auto">
+    <h2 style="margin:0">Ezydelivery</h2>
+    <p style="color:var(--green);font-size:14px;margin:0;font-weight:600">Durian anda tanggungjawab kami</p>
+    <p style="color:var(--mid);font-size:13px;margin:4px 0 0">Log masuk untuk urus penghantaran.</p>
+    <div id="gbtn"></div>
+  </div>
+
+  <!-- App -->
+  <div id="appView" style="display:none">
+    <div class="tabs">
+      <button data-tab="PENDING"     class="active" onclick="switchTab('PENDING')">Perlu Assign <span class="count" id="c-PENDING">0</span></button>
+      <button data-tab="ON_DELIVERY"                onclick="switchTab('ON_DELIVERY')">Dalam Hantaran <span class="count" id="c-ON_DELIVERY">0</span></button>
+      <button data-tab="DELIVERED"                  onclick="switchTab('DELIVERED')">Selesai</button>
+    </div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CFG = DELIVERY_CONFIG;  // from configs/ezydelivery.js (bare global, like COMPANY_CONFIG)
+let ID_TOKEN = null;
+let CURRENT_TAB = 'PENDING';
+let ORDERS = [];
+
+// ---- Google Sign-In --------------------------------------------------
+window.onload = () => {
+  if (!window.google || !google.accounts) { setTimeout(window.onload, 300); return; }
+  google.accounts.id.initialize({ client_id: CFG.clientId, callback: onCredential });
+  google.accounts.id.renderButton(document.getElementById('gbtn'),
+    { theme:'filled_green', size:'large', text:'signin_with', shape:'pill' });
+};
+
+function onCredential(res){
+  ID_TOKEN = res.credential;
+  const p = JSON.parse(atob(ID_TOKEN.split('.')[1]));
+  document.getElementById('who').textContent = p.email || '';
+  document.getElementById('signinView').style.display = 'none';
+  document.getElementById('appView').style.display = 'block';
+  loadOrders();
+}
+
+// ---- API -------------------------------------------------------------
+async function api(path, opts={}){
+  const r = await fetch(CFG.workerUrl + path, {
+    ...opts,
+    headers: { 'Content-Type':'application/json',
+               'Authorization':'Bearer ' + ID_TOKEN, ...(opts.headers||{}) },
+  });
+  if (r.status === 401){ toast('Sesi tamat — log masuk semula'); throw new Error('401'); }
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+async function loadOrders(){
+  try {
+    const { orders } = await api('/orders');
+    ORDERS = orders || [];
+    render();
+  } catch(e){ toast('Gagal muat: ' + e.message); }
+}
+
+// ---- Render ----------------------------------------------------------
+function switchTab(tab){
+  CURRENT_TAB = tab;
+  document.querySelectorAll('.tabs button').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === tab));
+  render();
+}
+
+function ordersFor(tab){
+  if (tab === 'PENDING')      return ORDERS.filter(o => o.status === 'PENDING');
+  if (tab === 'ON_DELIVERY')  return ORDERS.filter(o => o.status === 'ASSIGNED' || o.status === 'ON_DELIVERY');
+  return ORDERS.filter(o => o.status === 'DELIVERED');
+}
+
+function render(){
+  document.getElementById('c-PENDING').textContent = ordersFor('PENDING').length;
+  document.getElementById('c-ON_DELIVERY').textContent = ordersFor('ON_DELIVERY').length;
+
+  const rows = ordersFor(CURRENT_TAB);
+  const list = document.getElementById('list');
+  if (!rows.length){ list.innerHTML = '<div class="empty">Tiada order di sini.</div>'; return; }
+  list.innerHTML = rows.map(cardHTML).join('');
+}
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function productLine(o){
+  return (o.products||[]).map(p => `${esc(p.name)}${p.qty?' ×'+p.qty:''}`).join(', ');
+}
+
+function cardHTML(o){
+  const prod = productLine(o);
+  let actions = '';
+
+  if (o.status === 'PENDING'){
+    const dl = CFG.runners.map(r => `<option value="${esc(r)}">`).join('');
+    actions = `
+      <div class="form">
+        <div><label>Runner</label>
+          <input list="runners-${esc(o.order_id)}" id="run-${esc(o.order_id)}" placeholder="Nama runner">
+          <datalist id="runners-${esc(o.order_id)}">${dl}</datalist></div>
+        <div><label>Tracking</label><input id="trk-${esc(o.order_id)}" placeholder="cth EZ123456"></div>
+        <div><label>Anggaran tiba</label><input id="eta-${esc(o.order_id)}" placeholder="cth 3:00 PM"></div>
+        <div><label>Remark</label><input id="rmk-${esc(o.order_id)}" placeholder="pilihan"></div>
+        <div class="btn-row full">
+          <button class="btn btn-green" onclick="assign('${esc(o.order_id)}')">Simpan & Sedia Hantar</button>
+        </div>
+      </div>`;
+  } else if (o.status === 'ASSIGNED'){
+    actions = `
+      <div class="meta">Runner: <b>${esc(o.runner)}</b>${o.tracking?' · '+esc(o.tracking):''}${o.est_time?' · '+esc(o.est_time):''}</div>
+      <div class="btn-row">
+        <button class="btn btn-wa" onclick="sendWA('${esc(o.order_id)}',1)">Hantar WA #1 (Dalam hantaran)</button>
+      </div>`;
+  } else if (o.status === 'ON_DELIVERY'){
+    actions = `
+      <div class="meta">Runner: <b>${esc(o.runner)}</b>${o.tracking?' · '+esc(o.tracking):''}
+        ${o.wa1_sent_at?'<span class="sent"> ✓ WA#1 dihantar</span>':''}</div>
+      <div class="btn-row">
+        <button class="btn btn-out" onclick="sendWA('${esc(o.order_id)}',1)">Hantar WA #1 semula</button>
+        <button class="btn btn-green" onclick="markDelivered('${esc(o.order_id)}')">Tandakan Selesai</button>
+      </div>`;
+  } else if (o.status === 'DELIVERED'){
+    actions = `
+      <div class="meta">Runner: <b>${esc(o.runner)}</b>
+        ${o.wa2_sent_at?'<span class="sent"> ✓ WA#2 dihantar</span>':''}</div>
+      <div class="btn-row">
+        <button class="btn btn-wa" onclick="sendWA('${esc(o.order_id)}',2)">Hantar WA #2 (Selesai)</button>
+      </div>`;
+  }
+
+  return `
+    <div class="card">
+      <div class="top">
+        <div>
+          <span class="oid">#${esc(o.order_id)}</span>
+          <span class="badge b-${o.status}">${o.status}</span>
+        </div>
+        <span class="amt">RM${Number(o.total_amount||0).toFixed(2)}</span>
+      </div>
+      <div class="cust">${esc(o.customer_name)} · ${esc(o.phone)}</div>
+      <div class="meta">${prod?prod+'<br>':''}${esc(o.address)}</div>
+      ${actions}
+    </div>`;
+}
+
+// ---- Actions ---------------------------------------------------------
+async function assign(id){
+  const g = s => (document.getElementById(s+'-'+id)||{}).value || '';
+  const runner = g('run').trim();
+  if (!runner){ toast('Isi nama runner dulu'); return; }
+  try {
+    await api(`/orders/${encodeURIComponent(id)}/assign`, {
+      method:'POST',
+      body: JSON.stringify({ runner, tracking:g('trk').trim(),
+        est_time:g('eta').trim(), remark:g('rmk').trim() }),
+    });
+    const o = ORDERS.find(x => x.order_id === id);
+    if (o){ o.runner=runner; o.tracking=g('trk').trim(); o.est_time=g('eta').trim();
+            o.remark=g('rmk').trim(); o.status='ASSIGNED'; }
+    toast('Disimpan'); render();
+  } catch(e){ toast('Gagal: ' + e.message); }
+}
+
+// Build wa.me link from the DECOUPLED template and open it. We only assume
+// the message is sent (wa.me gives no delivery receipt) once staff taps.
+async function sendWA(id, which){
+  const o = ORDERS.find(x => x.order_id === id);
+  if (!o) return;
+  if (!o.phone){ toast('Tiada nombor telefon'); return; }
+  const tmpl = which === 1 ? CFG.waTemplates.onDelivery : CFG.waTemplates.delivered;
+  const url = `https://wa.me/${o.phone}?text=${encodeURIComponent(tmpl(o))}`;
+  window.open(url, '_blank');
+  try {
+    const body = which === 1 ? { status:'ON_DELIVERY', wa:'wa1' } : { wa:'wa2' };
+    await api(`/orders/${encodeURIComponent(id)}/status`, { method:'POST', body:JSON.stringify(body) });
+    if (which === 1){ o.status='ON_DELIVERY'; o.wa1_sent_at=new Date().toISOString(); }
+    else { o.wa2_sent_at=new Date().toISOString(); }
+    render();
+  } catch(e){ toast('Status tak dikemaskini: ' + e.message); }
+}
+
+async function markDelivered(id){
+  try {
+    await api(`/orders/${encodeURIComponent(id)}/status`, {
+      method:'POST', body: JSON.stringify({ status:'DELIVERED' }) });
+    const o = ORDERS.find(x => x.order_id === id);
+    if (o) o.status = 'DELIVERED';
+    toast('Selesai — jangan lupa hantar WA #2'); render();
+  } catch(e){ toast('Gagal: ' + e.message); }
+}
+
+// ---- UI helpers ------------------------------------------------------
+let toastT;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600);
+}
+</script>
+</body>
+</html>
