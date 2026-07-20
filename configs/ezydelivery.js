@@ -41,5 +41,14 @@ Terima kasih kerana memilih EzyDurian.`,
 Tempahan durian anda telah selamat sampai. Semoga berpuas hati!
 
 Terima kasih kerana memilih EzyDurian. 🌱`,
+
+    // Self-pickup — order ready to collect.
+    pickup: (o) =>
+`Assalamualaikum ${o.customer_name}.
+
+Tempahan durian anda sedia untuk diambil di EzyDurian Batu Caves (4PM - 9PM).
+Sila tunjukkan No. Order: ${o.order_id}
+
+Terima kasih kerana memilih EzyDurian. 🌱`,
   },
 };
