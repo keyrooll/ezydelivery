@@ -118,8 +118,8 @@
 <script>
 const CFG = DELIVERY_CONFIG;
 let ID_TOKEN=null, ME=null, VIEW='orders';
-let ORDERS=[], RUNNERS=[], USERS=[], CLAIMS=[];
-let F={ q:'', status:'', today:false, session:'' }; // order filters
+let ORDERS=[], RUNNERS=[], USERS=[], CLAIMS=[], FORMS=[];
+let F={ q:'', status:'', today:false, session:'', form:'' }; // order filters
 let CLAIM_TAB='pending';
 
 // ---- Sign-in ----
@@ -164,7 +164,7 @@ async function api(path, opts={}){
 function buildNav(){
   const items=[];
   if(ME.role==='admin'||ME.role==='staff') items.push(['orders','Order']);
-  if(ME.role==='admin') items.push(['runners','Runner'],['users','Pengguna']);
+  if(ME.role==='admin') items.push(['runners','Runner'],['forms','Cawangan'],['users','Pengguna']);
   if(ME.role==='admin'||ME.role==='account') items.push(['claims','Claim']);
   if(ME.role==='runner') items.push(['myjobs','Hantaran Saya']);
   document.getElementById('nav').innerHTML = items.map(([k,l])=>
@@ -175,9 +175,10 @@ function go(v){ VIEW=v; document.querySelectorAll('#nav button').forEach(b=>b.cl
 async function loadView(){
   const el=document.getElementById('view'); el.innerHTML='<div class="empty">Memuatkan…</div>';
   try{
-    if(VIEW==='orders'){ await Promise.all([loadOrders(), loadRunners().catch(()=>{})]); renderOrders(); }
+    if(VIEW==='orders'){ await Promise.all([loadOrders(), loadRunners().catch(()=>{}), loadForms().catch(()=>{})]); renderOrders(); }
     else if(VIEW==='myjobs'){ await loadOrders(); renderOrders(); }
     else if(VIEW==='runners'){ await loadRunners(); renderRunners(); }
+    else if(VIEW==='forms'){ await loadForms(); renderForms(); }
     else if(VIEW==='users'){ await Promise.all([loadUsers(),loadRunners()]); renderUsers(); }
     else if(VIEW==='claims'){ await loadClaims(); renderClaims(); }
   }catch(e){ el.innerHTML='<div class="empty">Gagal muat: '+e.message+'</div>'; }
@@ -223,6 +224,10 @@ function renderOrders(){
         <option value="CANCELED">Batal</option>
       </select>
       <label style="font-size:12px;color:var(--mid)"><input type="checkbox" id="td" ${F.today?'checked':''} onchange="applyFilter()"> Hari ni</label>
+      ${FORMS.length?`<select id="fm" onchange="setForm(this.value)">
+        <option value="">Semua cawangan</option>
+        ${FORMS.filter(f=>f.active).map(f=>`<option value="${esc(f.form_id)}" ${F.form===f.form_id?'selected':''}>${esc(f.name)}</option>`).join('')}
+      </select>`:''}
       <button class="btn btn-ink btn-sm" onclick="openManual()">+ Order Manual</button>
     </div>`;
     // Delivery-session sub-tabs
@@ -231,7 +236,8 @@ function renderOrders(){
       ${sTab('','Semua')}${sTab('sesi1','Sesi 1')}${sTab('sesi2','Sesi 2')}${sTab('pickup','Pickup')}</div>`;
   }
   let rows = ORDERS;
-  if(!isMy && F.session) rows = ORDERS.filter(o=>o.delivery_session===F.session);
+  if(!isMy && F.session) rows = rows.filter(o=>o.delivery_session===F.session);
+  if(!isMy && F.form) rows = rows.filter(o=>o.form_id===F.form);
   html += rows.length ? rows.map(o=>cardHTML(o,isMy)).join('') : '<div class="empty">Tiada order.</div>';
   el.innerHTML=html;
   if(!isMy){ const st=document.getElementById('st'); if(st) st.value=F.status; }
@@ -243,6 +249,7 @@ function applyFilter(){
   loadOrders().then(renderOrders).catch(e=>toast(e.message));
 }
 function setSession(s){ F.session=s; renderOrders(); } // client-side, no reload
+function setForm(v){ F.form=v; renderOrders(); }
 
 function sessionBadge(o){
   const map={ sesi1:['SESI 1','#e0e7ff','#3730a3'], sesi2:['SESI 2','#fce7f3','#9d174d'], pickup:['PICKUP','#ffedd5','#9a3412'] };
@@ -287,7 +294,7 @@ function cardHTML(o, isMy){
   }
   return `<div class="card">
     <div class="top">
-      <div><span class="oid">#${esc(o.order_id)}</span><span class="badge b-${o.status}">${o.status}</span> ${sessionBadge(o)}${dpill}${claimPill}</div>
+      <div><span class="oid">#${esc(o.order_id)}</span><span class="badge b-${o.status}">${o.status}</span> ${o.form_name?`<span class="pill" style="background:#e5e7eb;color:#374151">${esc(o.form_name)}</span>`:''}${sessionBadge(o)}${dpill}${claimPill}</div>
       <span class="amt">RM${(+o.total_amount||0).toFixed(2)}</span>
     </div>
     <div class="cust">${esc(o.customer_name)} · ${esc(o.phone)}</div>
@@ -423,6 +430,33 @@ async function saveRunner(){
 async function toggleRunner(id,active){
   try{ await api(`/runners/${encodeURIComponent(id)}`,{method:'POST',body:JSON.stringify({active})});
     await loadRunners(); renderRunners();
+  }catch(e){ toast('Gagal: '+e.message); }
+}
+
+// ==== FORMS (branches) ====
+async function loadForms(){ const {forms}=await api('/forms'); FORMS=forms||[]; }
+function renderForms(){
+  const el=document.getElementById('view');
+  el.innerHTML=`
+    <p style="color:var(--mid);font-size:13px;margin:0 0 12px">Setiap borang OnPay = satu cawangan. Bagi nama supaya senang tapis order ikut cawangan. Borang muncul sendiri bila order pertamanya masuk.</p>
+    <table class="tbl"><thead><tr><th>Form ID</th><th>Nama Cawangan</th><th>Status</th><th></th></tr></thead>
+    <tbody>${FORMS.map(f=>`<tr>
+      <td>${esc(f.form_id)}</td>
+      <td><input id="fn-${esc(f.form_id)}" value="${esc(f.name||'')}" style="padding:6px;border:1px solid var(--line);border-radius:6px;width:100%"></td>
+      <td>${f.active?'<span class="pill pill-free">Aktif</span>':'<span class="pill pill-pending">Nyahaktif</span>'}</td>
+      <td style="white-space:nowrap"><button class="btn btn-green btn-sm" onclick="saveForm('${esc(f.form_id)}')">Simpan</button>
+        <button class="btn btn-out btn-sm" onclick="toggleForm('${esc(f.form_id)}',${f.active?0:1})">${f.active?'Sorok':'Papar'}</button></td>
+    </tr>`).join('')||'<tr><td colspan=4 class="empty">Belum ada borang. Ia muncul auto bila order pertama masuk melalui webhook.</td></tr>'}</tbody></table>`;
+}
+async function saveForm(id){
+  const name=(document.getElementById('fn-'+id)||{}).value.trim();
+  try{ await api(`/forms/${encodeURIComponent(id)}`,{method:'POST',body:JSON.stringify({name})});
+    toast('Disimpan'); await loadForms(); renderForms();
+  }catch(e){ toast('Gagal: '+e.message); }
+}
+async function toggleForm(id,active){
+  try{ await api(`/forms/${encodeURIComponent(id)}`,{method:'POST',body:JSON.stringify({active})});
+    await loadForms(); renderForms();
   }catch(e){ toast('Gagal: '+e.message); }
 }
 
