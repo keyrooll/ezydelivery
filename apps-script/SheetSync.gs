@@ -13,7 +13,7 @@
  */
 
 var WORKER_URL = 'https://ezydelivery.keyrooll.workers.dev/sheet-ingest';
-var TOKEN      = '852bb9b669e63e50912088b4ad77cdb73420eaade4047ef1';
+var TOKEN      = 'PASTE_TOKEN_HERE'; // <-- ganti dengan token yang Claude beri (jangan commit ke repo public)
 var SHEET_NAME = 'Order Onpay';
 var ONLY_CONFIRMED = true; // only push rows with Status Jualan = DISAHKAN
 
