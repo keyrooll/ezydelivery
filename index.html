@@ -229,6 +229,7 @@ function renderOrders(){
         ${FORMS.filter(f=>f.active).map(f=>`<option value="${esc(f.form_id)}" ${F.form===f.form_id?'selected':''}>${esc(f.name)}</option>`).join('')}
       </select>`:''}
       <button class="btn btn-ink btn-sm" onclick="openManual()">+ Order Manual</button>
+      <button class="btn btn-out btn-sm" onclick="exportCSV()">⬇ Export Excel</button>
     </div>`;
     // Delivery-session sub-tabs
     const sTab=(k,l)=>`<button class="${F.session===k?'active':''}" onclick="setSession('${k}')">${l} <span style="opacity:.7">${ORDERS.filter(o=>k===''||o.delivery_session===k||(k==='none'&&!o.delivery_session)).length}</span></button>`;
@@ -250,6 +251,26 @@ function applyFilter(){
 }
 function setSession(s){ F.session=s; renderOrders(); } // client-side, no reload
 function setForm(v){ F.form=v; renderOrders(); }
+// One-click export: fetch all orders, build a CSV, download it. Opens in Excel/Sheets.
+async function exportCSV(){
+  try{
+    toast('Menyediakan fail…');
+    const { orders } = await api('/orders?limit=5000');
+    const cols=[['order_id','No. Order'],['created_at','Tarikh'],['customer_name','Nama'],
+      ['phone','Telefon'],['address','Alamat'],['__prod','Produk'],['total_amount','Jumlah (RM)'],
+      ['form_name','Cawangan'],['delivery_session','Sesi'],['runner_name','Runner'],['tracking','Tracking'],
+      ['status','Status'],['claim_amount','Claim (RM)'],['claim_status','Status Claim'],['updated_at','Dikemaskini']];
+    const q=v=>{ v=(v==null?'':String(v)); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+    const prod=o=>(o.products||[]).map(p=>p.name+(p.qty?' x'+p.qty:'')).join('; ');
+    let csv='﻿'+cols.map(c=>c[1]).join(',')+'\n';
+    (orders||[]).forEach(o=>{ csv+=cols.map(c=>q(c[0]==='__prod'?prod(o):o[c[0]])).join(',')+'\n'; });
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+    a.download='ezydelivery-'+new Date().toISOString().slice(0,10)+'.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('Fail dimuat turun ✓');
+  }catch(e){ toast('Gagal: '+e.message); }
+}
 
 function sessionBadge(o){
   const map={ sesi1:['SESI 1','#e0e7ff','#3730a3'], sesi2:['SESI 2','#fce7f3','#9d174d'], pickup:['PICKUP','#ffedd5','#9a3412'] };
