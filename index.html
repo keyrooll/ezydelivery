@@ -130,6 +130,7 @@ let ID_TOKEN=null, ME=null, VIEW='orders';
 let ORDERS=[], RUNNERS=[], USERS=[], CLAIMS=[], FORMS=[];
 let F={ q:'', status:'', today:false, session:'', form:'', kpi:'' }; // order filters
 let SEL=new Set(); // bulk-assign selection (order ids)
+let GPS_ON=false, GPS_LASTPOS=null, GPS_WATCH=null, GPS_TIMER=null, GPS_WAKE=null; // runner live GPS
 let CLAIM_TAB='pending';
 
 // ---- Sign-in ----
@@ -211,6 +212,7 @@ function renderOrders(){
   const el=document.getElementById('view');
   const isMy = VIEW==='myjobs';
   let html='';
+  if(isMy) html += gpsBar();
   if(!isMy){
     // KPI — clickable filters, counts over ALL orders (not the filtered view)
     const t=ORDERS.filter(o=>isToday(o.created_at));
@@ -279,6 +281,42 @@ function applyFilter(){
 function setKpi(k){ F.kpi = F.kpi===k ? '' : k; renderOrders(); } // click KPI to filter by status
 function setSession(s){ F.session=s; renderOrders(); } // client-side, no reload
 function setForm(v){ F.form=v; renderOrders(); }
+// ---- Runner live GPS (foreground PWA) ----
+function gpsBar(){
+  return `<div class="bulkbar" style="background:${GPS_ON?'var(--green)':'var(--ink)'}">
+    <b>📍 ${GPS_ON?'Lokasi sedang dikongsi':'Kongsi lokasi masa hantar'}</b>
+    <button class="btn btn-sm" style="background:#fff;color:var(--ink)" onclick="toggleGps()">${GPS_ON?'Henti':'Mula Kongsi Lokasi'}</button>
+    <span id="gpsInfo" style="font-size:11px;opacity:.85"></span>
+  </div>`;
+}
+function toggleGps(){
+  if(GPS_ON){ stopGps(); toast('Kongsi lokasi dihentikan'); renderOrders(); return; }
+  if(!navigator.geolocation){ toast('Peranti tak sokong GPS'); return; }
+  navigator.geolocation.getCurrentPosition(async(p)=>{
+    GPS_ON=true; GPS_LASTPOS=p.coords;
+    GPS_WATCH=navigator.geolocation.watchPosition(pos=>{ GPS_LASTPOS=pos.coords; }, ()=>{}, {enableHighAccuracy:true, maximumAge:10000});
+    await pingGps(); GPS_TIMER=setInterval(pingGps, 20000);
+    try{ if('wakeLock' in navigator) GPS_WAKE=await navigator.wakeLock.request('screen'); }catch(e){}
+    toast('Lokasi mula dikongsi'); renderOrders();
+  }, ()=>toast('Kebenaran lokasi ditolak'), {enableHighAccuracy:true, timeout:10000});
+}
+function stopGps(){
+  GPS_ON=false;
+  if(GPS_WATCH!=null){ navigator.geolocation.clearWatch(GPS_WATCH); GPS_WATCH=null; }
+  if(GPS_TIMER){ clearInterval(GPS_TIMER); GPS_TIMER=null; }
+  if(GPS_WAKE){ try{GPS_WAKE.release();}catch(e){} GPS_WAKE=null; }
+}
+async function pingGps(){
+  if(!GPS_LASTPOS) return;
+  try{ await api('/runner/ping',{method:'POST',body:JSON.stringify({lat:GPS_LASTPOS.latitude,lng:GPS_LASTPOS.longitude})});
+    const el=document.getElementById('gpsInfo'); if(el) el.textContent='✓ '+new Date().toLocaleTimeString();
+  }catch(e){}
+}
+async function runnerStatus(id,status){
+  try{ await api(`/orders/${encodeURIComponent(id)}/status`,{method:'POST',body:JSON.stringify({status})});
+    toast(status==='ON_DELIVERY'?'Mula hantar — jangan lupa kongsi lokasi':'Ditandakan sampai ✓'); await loadOrders(); renderOrders();
+  }catch(e){ toast('Gagal: '+e.message); }
+}
 // ---- Bulk assign ----
 function toggleSel(id){ SEL.has(id)?SEL.delete(id):SEL.add(id); renderOrders(); }
 function clearSel(){ SEL.clear(); renderOrders(); }
@@ -359,7 +397,14 @@ function cardHTML(o, isMy){
       <div class="meta">${rl?'Runner: <b>'+esc(rl)+'</b>':''} ${o.wa2_sent_at?'<span class="sent">✓ WA#2</span>':''}</div>
       <div class="btn-row"><button class="btn btn-wa" onclick="sendWA('${esc(o.order_id)}',2)">Hantar WA #2</button></div>`;
   } else {
-    actions=`<div class="meta">${o.tracking?'Tracking: '+esc(o.tracking):''} ${o.est_time?'· '+esc(o.est_time):''}</div>`;
+    const addr=encodeURIComponent(o.address||'');
+    actions=`<div class="btn-row">
+      <a class="btn btn-out btn-sm" href="https://www.google.com/maps/dir/?api=1&destination=${addr}" target="_blank">🧭 Navigate</a>
+      ${o.phone?`<a class="btn btn-out btn-sm" href="tel:${esc(o.phone)}">📞 Customer</a>`:''}
+      ${o.status==='ASSIGNED'?`<button class="btn btn-green btn-sm" onclick="runnerStatus('${esc(o.order_id)}','ON_DELIVERY')">Mula Hantar</button>`:''}
+      ${o.status==='ON_DELIVERY'?`<button class="btn btn-green btn-sm" onclick="runnerStatus('${esc(o.order_id)}','DELIVERED')">Tandakan Sampai</button>`:''}
+      ${o.status==='DELIVERED'?'<span class="badge b-DELIVERED">SELESAI</span>':''}
+    </div>`;
   }
   const canSelect = !isMy && o.status==='PENDING' && !isPickup;
   return `<div class="card">

@@ -7,6 +7,9 @@
 // Customer service number shown in the WA footer. Leave '' to hide the line.
 const CS_PHONE = '';  // cth '03-1234 5678'
 
+// Base URL of the public customer tracking page (track.html).
+const TRACK_BASE = 'https://keyrooll.github.io/ezydelivery/track.html';
+
 const MS_MONTHS = ['Januari','Februari','Mac','April','Mei','Jun','Julai','Ogos','September','Oktober','November','Disember'];
 function fmtDate(x){ if(!x) return '-'; const d=new Date(x); return isNaN(d)?String(x):(d.getDate()+' '+MS_MONTHS[d.getMonth()]+' '+d.getFullYear()); }
 function fmtItems(products){ const a=Array.isArray(products)?products:[]; return a.length ? a.map(p=>'• '+p.name+(p.qty?' × '+p.qty:'')).join('\n') : '• -'; }
@@ -57,7 +60,10 @@ ${fmtItems(o.products)}
 • Status: Dalam Perjalanan${o.tracking ? `
 • Tracking: ${o.tracking}` : ''}${o.est_time ? `
 • Anggaran Tiba: ${o.est_time}` : ''}
-
+${o.track_token ? `
+📍 Jejak lokasi runner secara langsung:
+${TRACK_BASE}?o=${encodeURIComponent(o.order_id)}&t=${o.track_token}
+` : ''}
 ⚠️ Mesej ini dihantar secara automatik oleh sistem EzyDurian. Sila jangan balas mesej ini kerana ia tidak dipantau.${CS_PHONE ? `
 
 Sekiranya perlu bantuan, hubungi khidmat pelanggan: ${CS_PHONE}.` : ''}
