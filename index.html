@@ -29,7 +29,10 @@
   nav.tabs button.active{ background:var(--green); color:#fff; border-color:var(--green); }
   /* KPI */
   .kpis{ display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:12px; }
-  .kpi{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px; text-align:center; }
+  .kpi{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px; text-align:center; cursor:pointer; transition:.12s; }
+  .kpi:hover{ border-color:var(--green2); }
+  .kpi-on{ background:var(--green); border-color:var(--green); }
+  .kpi-on .n, .kpi-on .l{ color:#fff; }
   .kpi .n{ font-size:20px; font-weight:800; color:var(--green); }
   .kpi .l{ font-size:10px; color:var(--mid); margin-top:2px; text-transform:uppercase; letter-spacing:.3px; }
   @media(max-width:640px){ .kpis{ grid-template-columns:repeat(2,1fr); } }
@@ -125,7 +128,7 @@
 const CFG = DELIVERY_CONFIG;
 let ID_TOKEN=null, ME=null, VIEW='orders';
 let ORDERS=[], RUNNERS=[], USERS=[], CLAIMS=[], FORMS=[];
-let F={ q:'', status:'', today:false, session:'', form:'' }; // order filters
+let F={ q:'', status:'', today:false, session:'', form:'', kpi:'' }; // order filters
 let SEL=new Set(); // bulk-assign selection (order ids)
 let CLAIM_TAB='pending';
 
@@ -192,14 +195,14 @@ async function loadView(){
 }
 
 // ==== ORDERS ====
+// Load ALL orders once; every filter runs client-side so KPIs stay accurate
+// and filtering is instant. (Runner role is still scoped server-side.)
 async function loadOrders(){
-  const p=new URLSearchParams();
-  if(F.q) p.set('q',F.q);
-  if(F.status) p.set('status',F.status);
-  if(F.today){ p.set('from', new Date().toISOString().slice(0,10)); }
-  const { orders } = await api('/orders'+(p.toString()?'?'+p:'' ));
+  const { orders } = await api('/orders?limit=5000');
   ORDERS=orders||[];
 }
+function isToday(x){ if(!x) return false; const d=new Date(x), n=new Date();
+  return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate(); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function productLine(o){ return (o.products||[]).map(p=>`${esc(p.name)}${p.qty?' ×'+p.qty:''}`).join(', '); }
 function runnerLabel(o){ return o.delivery_type==='lalamove' ? '' : (o.runner_name||''); }
@@ -209,16 +212,15 @@ function renderOrders(){
   const isMy = VIEW==='myjobs';
   let html='';
   if(!isMy){
-    // KPI
-    const today=new Date().toISOString().slice(0,10);
-    const t=ORDERS.filter(o=>(o.created_at||'').slice(0,10)===today);
-    const k=(n,l)=>`<div class="kpi"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+    // KPI — clickable filters, counts over ALL orders (not the filtered view)
+    const t=ORDERS.filter(o=>isToday(o.created_at));
+    const k=(n,l,key)=>`<div class="kpi${F.kpi===key?' kpi-on':''}" onclick="setKpi('${key}')"><div class="n">${n}</div><div class="l">${l}</div></div>`;
     html+=`<div class="kpis">
-      ${k(t.length,'Order Hari Ni')}
-      ${k(ORDERS.filter(o=>o.status==='PENDING').length,'Belum Assign')}
-      ${k(ORDERS.filter(o=>o.status==='ASSIGNED'||o.status==='ON_DELIVERY').length,'Dalam Hantaran')}
-      ${k(ORDERS.filter(o=>o.status==='DELIVERED').length,'Selesai')}
-      ${k('RM'+t.reduce((s,o)=>s+(+o.total_amount||0),0).toFixed(0),'Jualan Hari Ni')}
+      ${k(t.length,'Order Hari Ni','today')}
+      ${k(ORDERS.filter(o=>o.status==='PENDING').length,'Belum Assign','pending')}
+      ${k(ORDERS.filter(o=>o.status==='ASSIGNED'||o.status==='ON_DELIVERY').length,'Dalam Hantaran','delivery')}
+      ${k(ORDERS.filter(o=>o.status==='DELIVERED').length,'Selesai','done')}
+      ${k('RM'+t.reduce((s,o)=>s+(+o.total_amount||0),0).toFixed(0),'Jualan Hari Ni','today')}
     </div>`;
     html+=`<div class="toolbar">
       <input class="search" id="q" placeholder="Cari nama / telefon / order ID" value="${esc(F.q)}" onkeydown="if(event.key==='Enter')applyFilter()">
@@ -236,16 +238,26 @@ function renderOrders(){
         ${FORMS.filter(f=>f.active).map(f=>`<option value="${esc(f.form_id)}" ${F.form===f.form_id?'selected':''}>${esc(f.name)}</option>`).join('')}
       </select>`:''}
       <button class="btn btn-ink btn-sm" onclick="openManual()">+ Order Manual</button>
-      <button class="btn btn-out btn-sm" onclick="exportCSV()">⬇ Export Excel</button>
+      ${CFG.sheetUrl?`<button class="btn btn-out btn-sm" onclick="window.open(CFG.sheetUrl,'_blank')">📊 Buka Google Sheet</button>`:''}
     </div>`;
     // Delivery-session sub-tabs
     const sTab=(k,l)=>`<button class="${F.session===k?'active':''}" onclick="setSession('${k}')">${l} <span style="opacity:.7">${ORDERS.filter(o=>k===''||o.delivery_session===k||(k==='none'&&!o.delivery_session)).length}</span></button>`;
     html+=`<div class="subtabs" style="margin-bottom:12px">
       ${sTab('','Semua')}${sTab('sesi1','Sesi 1')}${sTab('sesi2','Sesi 2')}${sTab('pickup','Pickup')}</div>`;
   }
-  let rows = ORDERS;
-  if(!isMy && F.session) rows = rows.filter(o=>o.delivery_session===F.session);
-  if(!isMy && F.form) rows = rows.filter(o=>o.form_id===F.form);
+  let rows = ORDERS.slice();
+  if(!isMy){
+    if(F.q){ const qq=F.q.toLowerCase();
+      rows=rows.filter(o=>(o.customer_name||'').toLowerCase().includes(qq)||(o.phone||'').includes(F.q)||(o.order_id||'').toLowerCase().includes(qq)); }
+    if(F.status) rows=rows.filter(o=>o.status===F.status);
+    if(F.today) rows=rows.filter(o=>isToday(o.created_at));
+    if(F.session) rows=rows.filter(o=>o.delivery_session===F.session);
+    if(F.form) rows=rows.filter(o=>o.form_id===F.form);
+    if(F.kpi==='pending') rows=rows.filter(o=>o.status==='PENDING');
+    else if(F.kpi==='delivery') rows=rows.filter(o=>o.status==='ASSIGNED'||o.status==='ON_DELIVERY');
+    else if(F.kpi==='done') rows=rows.filter(o=>o.status==='DELIVERED');
+    else if(F.kpi==='today') rows=rows.filter(o=>isToday(o.created_at));
+  }
   if(!isMy){
     const av = rows.filter(o=>o.status==='PENDING'&&o.delivery_session!=='pickup');
     if(av.length){
@@ -262,8 +274,9 @@ function applyFilter(){
   F.q=(document.getElementById('q')||{}).value||'';
   F.status=(document.getElementById('st')||{}).value||'';
   F.today=(document.getElementById('td')||{}).checked||false;
-  loadOrders().then(renderOrders).catch(e=>toast(e.message));
+  renderOrders(); // all client-side now
 }
+function setKpi(k){ F.kpi = F.kpi===k ? '' : k; renderOrders(); } // click KPI to filter by status
 function setSession(s){ F.session=s; renderOrders(); } // client-side, no reload
 function setForm(v){ F.form=v; renderOrders(); }
 // ---- Bulk assign ----
@@ -304,26 +317,6 @@ async function doBulkAssign(){
   }
   try{ const res=await api('/orders/bulk-assign',{method:'POST',body:JSON.stringify(body)});
     toast((res.assigned||0)+' order diassign'); SEL.clear(); await loadOrders(); renderOrders();
-  }catch(e){ toast('Gagal: '+e.message); }
-}
-// One-click export: fetch all orders, build a CSV, download it. Opens in Excel/Sheets.
-async function exportCSV(){
-  try{
-    toast('Menyediakan fail…');
-    const { orders } = await api('/orders?limit=5000');
-    const cols=[['order_id','No. Order'],['created_at','Tarikh'],['customer_name','Nama'],
-      ['phone','Telefon'],['address','Alamat'],['__prod','Produk'],['total_amount','Jumlah (RM)'],
-      ['form_name','Cawangan'],['delivery_session','Sesi'],['runner_name','Runner'],['tracking','Tracking'],
-      ['status','Status'],['claim_amount','Claim (RM)'],['claim_status','Status Claim'],['updated_at','Dikemaskini']];
-    const q=v=>{ v=(v==null?'':String(v)); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
-    const prod=o=>(o.products||[]).map(p=>p.name+(p.qty?' x'+p.qty:'')).join('; ');
-    let csv='﻿'+cols.map(c=>c[1]).join(',')+'\n';
-    (orders||[]).forEach(o=>{ csv+=cols.map(c=>q(c[0]==='__prod'?prod(o):o[c[0]])).join(',')+'\n'; });
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-    a.download='ezydelivery-'+new Date().toISOString().slice(0,10)+'.csv';
-    document.body.appendChild(a); a.click(); a.remove();
-    toast('Fail dimuat turun ✓');
   }catch(e){ toast('Gagal: '+e.message); }
 }
 

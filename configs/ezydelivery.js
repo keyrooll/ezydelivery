@@ -3,6 +3,14 @@
 // =====================
 // Delivery / customer-management module for EzyDurian.
 // Data lives in Cloudflare D1 (via ezydelivery-worker), NOT Google Sheets.
+
+// Customer service number shown in the WA footer. Leave '' to hide the line.
+const CS_PHONE = '';  // cth '03-1234 5678'
+
+const MS_MONTHS = ['Januari','Februari','Mac','April','Mei','Jun','Julai','Ogos','September','Oktober','November','Disember'];
+function fmtDate(x){ if(!x) return '-'; const d=new Date(x); return isNaN(d)?String(x):(d.getDate()+' '+MS_MONTHS[d.getMonth()]+' '+d.getFullYear()); }
+function fmtItems(products){ const a=Array.isArray(products)?products:[]; return a.length ? a.map(p=>'• '+p.name+(p.qty?' × '+p.qty:'')).join('\n') : '• -'; }
+
 const DELIVERY_CONFIG = {
   id: 'ezydelivery',
   name: 'EzyDurian Delivery',
@@ -15,6 +23,10 @@ const DELIVERY_CONFIG = {
   // ezydelivery-worker base URL (no trailing slash). Set after first deploy.
   workerUrl: 'https://ezydelivery.keyrooll.workers.dev',
 
+  // Live Google Sheet (fed by =IMPORTDATA from workerUrl/orders.csv). The
+  // "Buka Google Sheet" button opens this. Leave '' to hide the button.
+  sheetUrl: 'https://docs.google.com/spreadsheets/d/1tEn5oSoYrFsiDQ_CtQnLSVHMk5vplhjvdP0XOvwY_I4/edit',
+
   // (Runner list now comes from D1 via /runners — no static list here.)
 
   // ---- Message templates -------------------------------------------------
@@ -25,14 +37,32 @@ const DELIVERY_CONFIG = {
   waTemplates: {
     // Message #1 — sent when a runner is assigned / out for delivery.
     onDelivery: (o) =>
-`Assalamualaikum ${o.customer_name}.
+`Assalamualaikum ${o.customer_name}. 😊
 
-Tempahan durian anda sedang dalam penghantaran.${o.runner ? `
-Runner: ${o.runner}` : ''}${o.tracking ? `
-Tracking: ${o.tracking}` : ''}${o.est_time ? `
-Anggaran tiba: ${o.est_time}` : ''}
+Terima kasih kerana membuat tempahan dengan EzyDurian.
 
-Terima kasih kerana memilih EzyDurian.`,
+🚚 Tempahan anda kini sedang dalam proses penghantaran.
+
+*Maklumat Tempahan*
+• No. Tempahan: #${o.order_id}
+• Tarikh Tempahan: ${fmtDate(o.created_at)}
+
+*Item Ditempah*
+${fmtItems(o.products)}
+
+*Maklumat Penghantaran*${o.runner ? `
+• Nama Runner: ${o.runner}${o.runner_phone ? `
+• No. Telefon Runner: ${o.runner_phone}` : ''}` : `
+• Kaedah: Lalamove`}
+• Status: Dalam Perjalanan${o.tracking ? `
+• Tracking: ${o.tracking}` : ''}${o.est_time ? `
+• Anggaran Tiba: ${o.est_time}` : ''}
+
+⚠️ Mesej ini dihantar secara automatik oleh sistem EzyDurian. Sila jangan balas mesej ini kerana ia tidak dipantau.${CS_PHONE ? `
+
+Sekiranya perlu bantuan, hubungi khidmat pelanggan: ${CS_PHONE}.` : ''}
+
+Terima kasih kerana memilih EzyDurian. 💛`,
 
     // Message #2 — sent when the order is marked delivered.
     delivered: (o) =>
