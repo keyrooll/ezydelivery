@@ -19,7 +19,7 @@ const DELIVERY_CONFIG = {
   name: 'EzyDurian Delivery',
   shortName: 'EzyDelivery',
   themeColor: '#1a7a4a',
-  version: 'v1.1',  // bumped on every file change (see header + track.html)
+  version: 'v1.2',  // bumped on every file change (see header + track.html)
 
   // Google Sign-In — identifies staff. Worker checks the email allowlist.
   clientId: '27154479564-ufljm52nmlh4gg7ie54knphff44jvrrq.apps.googleusercontent.com',
