@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ezydelivery — Durian anda tanggungjawab kami</title>
+<title>Ezydelivery — #1 Durian Delivery</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="configs/ezydelivery.js"></script>
 <style>
   :root{ --green:#1a7a4a; --green2:#2d9e62; --bg:#f4f6f5; --card:#fff;
@@ -32,7 +33,7 @@
   .kpi{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px; text-align:center; cursor:pointer; transition:.12s; }
   .kpi:hover{ border-color:var(--green2); }
   .kpi-on{ background:var(--green); border-color:var(--green); }
-  .kpi-on .n, .kpi-on .l{ color:#fff; }
+  .kpi.kpi-on .n, .kpi.kpi-on .l{ color:#fff !important; }
   .kpi .n{ font-size:20px; font-weight:800; color:var(--green); }
   .kpi .l{ font-size:10px; color:var(--mid); margin-top:2px; text-transform:uppercase; letter-spacing:.3px; }
   @media(max-width:640px){ .kpis{ grid-template-columns:repeat(2,1fr); } }
@@ -92,14 +93,34 @@
   .modal.show{ display:flex; } .modal .box{ background:#fff; border-radius:12px; padding:18px; width:420px; max-width:100%; }
   .modal h3{ margin:0 0 12px; } .modal .field{ margin-bottom:10px; }
   .modal label{ font-size:12px; color:var(--mid); display:block; margin-bottom:3px; }
-  .modal input,.modal select{ width:100%; padding:9px; border:1px solid var(--line); border-radius:8px; font-size:14px; }
+  .modal input,.modal select,.modal textarea{ width:100%; padding:9px; border:1px solid var(--line); border-radius:8px; font-size:14px; }
+  .modal .box.wide{ width:520px; }
+  .switch{ position:relative; display:inline-block; width:44px; height:24px; }
+  .switch input{ opacity:0; width:0; height:0; }
+  .switch .sl{ position:absolute; cursor:pointer; inset:0; background:#cbd5d1; border-radius:24px; transition:.2s; }
+  .switch .sl:before{ content:''; position:absolute; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; }
+  .switch input:checked + .sl{ background:var(--green); }
+  .switch input:checked + .sl:before{ transform:translateX(20px); }
+  .lnk{ color:var(--green); font-weight:700; cursor:pointer; text-decoration:none; }
+  .lnk:hover{ text-decoration:underline; }
+  .dgrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:14px; }
+  .stat{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .stat .l{ font-size:12px; color:var(--mid); } .stat .n{ font-size:26px; font-weight:800; color:var(--ink); margin-top:3px; }
+  .stat .d{ font-size:11px; margin-top:2px; }
+  .panel{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:14px; }
+  .panel h4{ margin:0 0 12px; font-size:14px; }
+  .notif{ background:#dcfce7; border:1px solid #86efac; color:#166534; border-radius:12px; padding:12px 14px; margin-bottom:12px; font-size:13px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .drow{ display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px; }
+  .drow:last-child{ border-bottom:none; }
+  .krow{ display:flex; justify-content:space-between; font-size:13px; padding:5px 0; }
+  .krow .k{ color:var(--mid); }
 </style>
 </head>
 <body>
 <header>
   <div class="brand">
     <img src="logo/ezydelivery.png" alt="Ezydelivery">
-    <div><div class="name">Ezydelivery</div><div class="tag">Durian anda tanggungjawab kami · <span id="appver"></span></div></div>
+    <div><div class="name">Ezydelivery</div><div class="tag">#1 Durian Delivery · <span id="appver"></span></div></div>
   </div>
   <div class="who" id="who"></div>
 </header>
@@ -108,7 +129,7 @@
   <div id="signinView" class="signin">
     <img src="logo/ezydelivery.png" alt="Ezydelivery" style="width:200px;max-width:70vw;height:auto">
     <h2 style="color:var(--green)">Ezydelivery</h2>
-    <p style="color:var(--green);font-weight:600;margin:0">Durian anda tanggungjawab kami</p>
+    <p style="color:var(--green);font-weight:600;margin:0">#1 Durian Delivery</p>
     <p style="color:var(--mid);font-size:13px;margin:4px 0 0">Log masuk untuk teruskan.</p>
     <div id="gbtn"></div>
     <p id="noAccess" style="color:#991b1b;font-size:13px;display:none">
@@ -129,7 +150,7 @@ const CFG = DELIVERY_CONFIG;
 { const _v=document.getElementById('appver'); if(_v) _v.textContent=CFG.version||''; }
 let ID_TOKEN=null, ME=null, VIEW='orders';
 let ORDERS=[], RUNNERS=[], USERS=[], CLAIMS=[], FORMS=[];
-let F={ q:'', status:'', today:false, session:'', form:'', kpi:'' }; // order filters
+let F={ q:'', status:'', today:false, session:'', form:'', kpi:'', date:'' }; // order filters
 let SEL=new Set(); // bulk-assign selection (order ids)
 let GPS_ON=false, GPS_LASTPOS=null, GPS_WATCH=null, GPS_TIMER=null, GPS_WAKE=null; // runner live GPS
 let CLAIM_TAB='pending';
@@ -149,7 +170,7 @@ async function onCredential(res){
     document.getElementById('signinView').style.display='none';
     document.getElementById('appView').style.display='block';
     renderWho(); buildNav();
-    VIEW = ME.role==='runner' ? 'myjobs' : (ME.role==='account' ? 'claims' : 'orders');
+    VIEW = ME.role==='runner' ? 'myjobs' : (ME.role==='account' ? 'claims' : 'dashboard');
     loadView();
   }catch(e){
     if(String(e.message).includes('401')) document.getElementById('noAccess').style.display='block';
@@ -175,23 +196,27 @@ async function api(path, opts={}){
 // ---- Nav ----
 function buildNav(){
   const items=[];
-  if(ME.role==='admin'||ME.role==='staff') items.push(['orders','Order']);
+  if(ME.role==='admin'||ME.role==='staff') items.push(['dashboard','Dashboard'],['orders','Order']);
   if(ME.role==='admin') items.push(['runners','Runner'],['forms','Cawangan'],['users','Pengguna']);
   if(ME.role==='admin'||ME.role==='account') items.push(['claims','Claim']);
   if(ME.role==='runner') items.push(['myjobs','Hantaran Saya']);
-  document.getElementById('nav').innerHTML = items.map(([k,l])=>
-    `<button data-v="${k}" class="${k===VIEW?'active':''}" onclick="go('${k}')">${l}</button>`).join('');
+  if(ME.role==='admin') items.push(['complaints','Aduan']);
+  let html = items.map(([k,l])=>`<button data-v="${k}" class="${k===VIEW?'active':''}" onclick="go('${k}')">${l}</button>`).join('');
+  html += `<button onclick="openComplaint()">＋ Buat Aduan</button>`; // any role
+  document.getElementById('nav').innerHTML = html;
 }
 function go(v){ VIEW=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v)); loadView(); }
 
 async function loadView(){
   const el=document.getElementById('view'); el.innerHTML='<div class="empty">Memuatkan…</div>';
   try{
-    if(VIEW==='orders'){ await Promise.all([loadOrders(), loadRunners().catch(()=>{}), loadForms().catch(()=>{})]); renderOrders(); }
-    else if(VIEW==='myjobs'){ await loadOrders(); renderOrders(); }
-    else if(VIEW==='runners'){ await loadRunners(); renderRunners(); }
+    if(VIEW==='dashboard'){ await Promise.all([loadOrders(), loadRunners().catch(()=>{}), loadForms().catch(()=>{})]); renderDashboard(); }
+    else if(VIEW==='orders'){ await Promise.all([loadOrders(), loadRunners().catch(()=>{}), loadForms().catch(()=>{})]); renderOrders(); }
+    else if(VIEW==='myjobs'){ await Promise.all([loadOrders(), loadMyNotifs().catch(()=>{})]); renderOrders(); }
+    else if(VIEW==='runners'){ await Promise.all([loadRunners(), loadOrders().catch(()=>{})]); renderRunners(); }
     else if(VIEW==='forms'){ await loadForms(); renderForms(); }
-    else if(VIEW==='users'){ await Promise.all([loadUsers(),loadRunners()]); renderUsers(); }
+    else if(VIEW==='complaints'){ await loadComplaints(); renderComplaints(); }
+    else if(VIEW==='users'){ await Promise.all([loadUsers(),loadRunners(),loadOrders().catch(()=>{})]); renderUsers(); }
     else if(VIEW==='claims'){ await loadClaims(); renderClaims(); }
   }catch(e){ el.innerHTML='<div class="empty">Gagal muat: '+e.message+'</div>'; }
 }
@@ -213,7 +238,7 @@ function renderOrders(){
   const el=document.getElementById('view');
   const isMy = VIEW==='myjobs';
   let html='';
-  if(isMy) html += gpsBar();
+  if(isMy) html += notifBanner() + gpsBar();
   if(!isMy){
     // KPI — clickable filters, counts over ALL orders (not the filtered view)
     const t=ORDERS.filter(o=>isToday(o.created_at));
@@ -235,7 +260,8 @@ function renderOrders(){
         <option value="DELIVERED">Selesai</option>
         <option value="CANCELED">Batal</option>
       </select>
-      <label style="font-size:12px;color:var(--mid)"><input type="checkbox" id="td" ${F.today?'checked':''} onchange="applyFilter()"> Hari ni</label>
+      <input type="date" id="dt2" value="${esc(F.date)}" onchange="applyFilter()" title="Tapis ikut tarikh">
+      ${F.date?`<button class="btn btn-out btn-sm" onclick="clearDate()">✕ tarikh</button>`:''}
       ${FORMS.length?`<select id="fm" onchange="setForm(this.value)">
         <option value="">Semua cawangan</option>
         ${FORMS.filter(f=>f.active).map(f=>`<option value="${esc(f.form_id)}" ${F.form===f.form_id?'selected':''}>${esc(f.name)}</option>`).join('')}
@@ -253,7 +279,7 @@ function renderOrders(){
     if(F.q){ const qq=F.q.toLowerCase();
       rows=rows.filter(o=>(o.customer_name||'').toLowerCase().includes(qq)||(o.phone||'').includes(F.q)||(o.order_id||'').toLowerCase().includes(qq)); }
     if(F.status) rows=rows.filter(o=>o.status===F.status);
-    if(F.today) rows=rows.filter(o=>isToday(o.created_at));
+    if(F.date) rows=rows.filter(o=>(o.created_at||'').slice(0,10)===F.date);
     if(F.session) rows=rows.filter(o=>o.delivery_session===F.session);
     if(F.form) rows=rows.filter(o=>o.form_id===F.form);
     if(F.kpi==='pending') rows=rows.filter(o=>o.status==='PENDING');
@@ -276,9 +302,10 @@ function renderOrders(){
 function applyFilter(){
   F.q=(document.getElementById('q')||{}).value||'';
   F.status=(document.getElementById('st')||{}).value||'';
-  F.today=(document.getElementById('td')||{}).checked||false;
+  F.date=(document.getElementById('dt2')||{}).value||'';
   renderOrders(); // all client-side now
 }
+function clearDate(){ F.date=''; renderOrders(); }
 function setKpi(k){ F.kpi = F.kpi===k ? '' : k; renderOrders(); } // click KPI to filter by status
 function setSession(s){ F.session=s; renderOrders(); } // client-side, no reload
 function setForm(v){ F.form=v; renderOrders(); }
@@ -477,7 +504,8 @@ async function markDelivered(id){
 }
 
 // ==== EDIT / MANUAL (modal) ====
-function showModal(html){ document.getElementById('modalBox').innerHTML=html; document.getElementById('modal').classList.add('show'); }
+function showModal(html){ const b=document.getElementById('modalBox'); b.className='box'; b.innerHTML=html; document.getElementById('modal').classList.add('show'); }
+function showModalWide(html){ const b=document.getElementById('modalBox'); b.className='box wide'; b.innerHTML=html; document.getElementById('modal').classList.add('show'); }
 function closeModal(){ document.getElementById('modal').classList.remove('show'); }
 function openEdit(id){
   const o=ORDERS.find(x=>x.order_id===id); if(!o) return;
@@ -523,10 +551,46 @@ function renderRunners(){
     <div class="toolbar"><button class="btn btn-ink btn-sm" onclick="openRunner()">+ Tambah Runner</button></div>
     <table class="tbl"><thead><tr><th>Nama</th><th>Telefon</th><th>Login (email)</th><th>Status</th><th></th></tr></thead>
     <tbody>${RUNNERS.map(r=>`<tr>
-      <td>${esc(r.name)}</td><td>${esc(r.phone||'')}</td><td>${esc(r.email||'—')}</td>
+      <td><span class="lnk" onclick="openRunnerDetail('${esc(r.id)}')">${esc(r.name)}</span></td>
+      <td>${esc(r.phone||'')}</td><td>${esc(r.email||'—')}</td>
       <td>${r.active?'<span class="pill pill-free">Aktif</span>':'<span class="pill pill-pending">Nyahaktif</span>'}</td>
-      <td><button class="btn btn-out btn-sm" onclick="toggleRunner('${esc(r.id)}',${r.active?0:1})">${r.active?'Nyahaktif':'Aktifkan'}</button></td>
+      <td style="white-space:nowrap"><button class="btn btn-out btn-sm" onclick="toggleRunner('${esc(r.id)}',${r.active?0:1})">${r.active?'Nyahaktif':'Aktifkan'}</button>
+        <button class="btn btn-out btn-sm" style="color:#b91c1c;border-color:#fca5a5" onclick="deleteRunner('${esc(r.id)}','${esc(r.name)}')">Delete</button></td>
     </tr>`).join('')||'<tr><td colspan=5 class="empty">Tiada runner.</td></tr>'}</tbody></table>`;
+}
+async function deleteRunner(id,name){
+  if(!confirm('Padam runner "'+name+'"? Order lama kekal tapi tak lagi terpaut pada runner ini.')) return;
+  try{ await api(`/runners/${encodeURIComponent(id)}/delete`,{method:'POST',body:'{}'});
+    toast('Runner dipadam'); await loadRunners(); renderRunners();
+  }catch(e){ toast('Gagal: '+e.message); }
+}
+function runnerStats(rid){
+  const os=ORDERS.filter(o=>o.runner_id===rid);
+  const delivered=os.filter(o=>o.status==='DELIVERED');
+  const claims=os.filter(o=>o.claim_amount!=null);
+  const pending=claims.filter(o=>o.claim_status==='pending').reduce((s,o)=>s+(+o.claim_amount||0),0);
+  const paid=claims.filter(o=>o.claim_status==='paid').reduce((s,o)=>s+(+o.claim_amount||0),0);
+  const rated=os.filter(o=>o.rating); const avg=rated.length?(rated.reduce((s,o)=>s+o.rating,0)/rated.length):0;
+  return { os, total:os.length, delivered:delivered.length, active:os.filter(o=>o.status==='ASSIGNED'||o.status==='ON_DELIVERY').length, pending, paid, avg, rated:rated.length };
+}
+function openRunnerDetail(rid){
+  const r=RUNNERS.find(x=>x.id===rid); if(!r) return;
+  const s=runnerStats(rid);
+  showModalWide(`<h3>${esc(r.name)}</h3>
+    <div style="font-size:12px;color:var(--mid);margin-bottom:12px">${esc(r.phone||'-')} · ${esc(r.email||'tiada login')} · ${r.active?'Aktif':'Nyahaktif'}</div>
+    <div class="dgrid">
+      <div class="stat"><div class="l">Jumlah order</div><div class="n">${s.total}</div></div>
+      <div class="stat"><div class="l">Selesai</div><div class="n">${s.delivered}</div></div>
+      <div class="stat"><div class="l">Rating</div><div class="n">${s.avg?s.avg.toFixed(1)+'★':'-'}</div><div class="d" style="color:var(--mid)">${s.rated} penilaian</div></div>
+    </div>
+    <div class="panel" style="margin:0 0 12px"><h4>Bayaran (Claim)</h4>
+      <div class="krow"><span class="k">Belum bayar</span><b style="color:#b91c1c">RM${s.pending.toFixed(2)}</b></div>
+      <div class="krow"><span class="k">Dah bayar</span><b style="color:var(--green)">RM${s.paid.toFixed(2)}</b></div>
+      <div class="krow"><span class="k">Jumlah pendapatan</span><b>RM${(s.pending+s.paid).toFixed(2)}</b></div>
+    </div>
+    <h4 style="margin:0 0 6px;font-size:13px">Kerja terkini</h4>
+    <div style="max-height:220px;overflow:auto">${s.os.slice(0,20).map(o=>`<div class="drow"><span style="flex:1">#${esc(o.order_id)}</span><span class="badge b-${o.status}">${o.status}</span>${o.claim_amount!=null?`<span class="pill pill-${o.claim_status==='paid'?'paid':'pending'}">RM${(+o.claim_amount).toFixed(0)}</span>`:''}</div>`).join('')||'<div class="empty">Tiada kerja lagi.</div>'}</div>
+    <div class="btn-row"><button class="btn btn-out" onclick="closeModal()">Tutup</button></div>`);
 }
 function openRunner(){
   showModal(`<h3>Tambah Runner Freelance</h3>
@@ -551,23 +615,25 @@ async function toggleRunner(id,active){
 
 // ==== FORMS (branches) ====
 async function loadForms(){ const {forms}=await api('/forms'); FORMS=forms||[]; }
+let EDIT_FORM=null;
 function renderForms(){
   const el=document.getElementById('view');
   el.innerHTML=`
-    <p style="color:var(--mid);font-size:13px;margin:0 0 12px">Setiap borang OnPay = satu cawangan. Bagi nama supaya senang tapis order ikut cawangan. Borang muncul sendiri bila order pertamanya masuk.</p>
-    <table class="tbl"><thead><tr><th>Form ID</th><th>Nama Cawangan</th><th>Status</th><th></th></tr></thead>
-    <tbody>${FORMS.map(f=>`<tr>
-      <td>${esc(f.form_id)}</td>
-      <td><input id="fn-${esc(f.form_id)}" value="${esc(f.name||'')}" style="padding:6px;border:1px solid var(--line);border-radius:6px;width:100%"></td>
-      <td>${f.active?'<span class="pill pill-free">Aktif</span>':'<span class="pill pill-pending">Nyahaktif</span>'}</td>
-      <td style="white-space:nowrap"><button class="btn btn-green btn-sm" onclick="saveForm('${esc(f.form_id)}')">Simpan</button>
-        <button class="btn btn-out btn-sm" onclick="toggleForm('${esc(f.form_id)}',${f.active?0:1})">${f.active?'Sorok':'Papar'}</button></td>
-    </tr>`).join('')||'<tr><td colspan=4 class="empty">Belum ada borang. Ia muncul auto bila order pertama masuk melalui webhook.</td></tr>'}</tbody></table>`;
+    <p style="color:var(--mid);font-size:13px;margin:0 0 12px">Setiap borang OnPay = satu cawangan. Bagi nama supaya senang tapis order ikut cawangan. Toggle untuk aktif/nyahaktif.</p>
+    <table class="tbl"><thead><tr><th>Form ID</th><th>Nama Cawangan</th><th>Aktif</th><th></th></tr></thead>
+    <tbody>${FORMS.map(f=>{ const id=esc(f.form_id); const editing=EDIT_FORM===f.form_id; return `<tr>
+      <td>${id}</td>
+      <td>${editing?`<input id="fn-${id}" value="${esc(f.name||'')}" style="padding:6px;border:1px solid var(--line);border-radius:6px;width:100%">`:`<b>${esc(f.name||'')}</b>`}</td>
+      <td><label class="switch"><input type="checkbox" ${f.active?'checked':''} onchange="toggleForm('${id}',this.checked?1:0)"><span class="sl"></span></label></td>
+      <td style="white-space:nowrap">${editing
+        ? `<button class="btn btn-green btn-sm" onclick="saveForm('${id}')">Simpan</button> <button class="btn btn-out btn-sm" onclick="EDIT_FORM=null;renderForms()">Batal</button>`
+        : `<button class="btn btn-out btn-sm" onclick="EDIT_FORM='${id}';renderForms()">Edit</button>`}</td>
+    </tr>`;}).join('')||'<tr><td colspan=4 class="empty">Belum ada borang. Ia muncul auto bila order pertama masuk melalui webhook.</td></tr>'}</tbody></table>`;
 }
 async function saveForm(id){
-  const name=(document.getElementById('fn-'+id)||{}).value.trim();
+  const name=((document.getElementById('fn-'+id)||{}).value||'').trim();
   try{ await api(`/forms/${encodeURIComponent(id)}`,{method:'POST',body:JSON.stringify({name})});
-    toast('Disimpan'); await loadForms(); renderForms();
+    EDIT_FORM=null; toast('Disimpan'); await loadForms(); renderForms();
   }catch(e){ toast('Gagal: '+e.message); }
 }
 async function toggleForm(id,active){
@@ -578,13 +644,32 @@ async function toggleForm(id,active){
 
 // ==== USERS ====
 async function loadUsers(){ const {users}=await api('/users'); USERS=users||[]; }
+function openUserDetail(email){
+  const u=USERS.find(x=>x.email===email); if(!u) return;
+  let extra='';
+  if(u.runner_id){ const s=runnerStats(u.runner_id);
+    extra=`<div class="dgrid"><div class="stat"><div class="l">Order</div><div class="n">${s.total}</div></div>
+      <div class="stat"><div class="l">Selesai</div><div class="n">${s.delivered}</div></div>
+      <div class="stat"><div class="l">Rating</div><div class="n">${s.avg?s.avg.toFixed(1)+'★':'-'}</div></div></div>
+      <div class="panel" style="margin:0"><h4>Bayaran</h4>
+      <div class="krow"><span class="k">Belum bayar</span><b style="color:#b91c1c">RM${s.pending.toFixed(2)}</b></div>
+      <div class="krow"><span class="k">Dah bayar</span><b style="color:var(--green)">RM${s.paid.toFixed(2)}</b></div></div>`;
+  }
+  showModalWide(`<h3>${esc(u.email)}</h3>
+    <div class="panel" style="margin:0 0 12px"><h4>Profil</h4>
+      <div class="krow"><span class="k">Role</span><b>${esc(u.role)}</b></div>
+      <div class="krow"><span class="k">Runner terpaut</span><b>${esc(u.runner_name||'—')}</b></div>
+      <div class="krow"><span class="k">Status</span><b>${u.active?'Aktif':'Nyahaktif'}</b></div>
+    </div>${extra}
+    <div class="btn-row"><button class="btn btn-out" onclick="closeModal()">Tutup</button></div>`);
+}
 function renderUsers(){
   const el=document.getElementById('view');
   el.innerHTML=`
     <div class="toolbar"><button class="btn btn-ink btn-sm" onclick="openUser()">+ Beri Akses</button></div>
     <table class="tbl"><thead><tr><th>Email</th><th>Role</th><th>Runner</th><th>Status</th><th></th></tr></thead>
     <tbody>${USERS.map(u=>`<tr>
-      <td>${esc(u.email)}</td><td><span class="pill pill-free">${esc(u.role)}</span></td>
+      <td><span class="lnk" onclick="openUserDetail('${esc(u.email)}')">${esc(u.email)}</span></td><td><span class="pill pill-free">${esc(u.role)}</span></td>
       <td>${esc(u.runner_name||'—')}</td>
       <td>${u.active?'Aktif':'Nyahaktif'}</td>
       <td>${u.email==='keyrooll@gmail.com'?'':`<button class="btn btn-out btn-sm" onclick="toggleUser('${esc(u.email)}',${u.active?0:1})">${u.active?'Nyahaktif':'Aktifkan'}</button>`}</td>
@@ -621,37 +706,123 @@ async function toggleUser(email,active){
 
 // ==== CLAIMS ====
 async function loadClaims(){ const {claims}=await api('/claims?status='+CLAIM_TAB); CLAIMS=claims||[]; }
+let CLAIM_SEL=new Set();
+function claimToggle(id){ CLAIM_SEL.has(id)?CLAIM_SEL.delete(id):CLAIM_SEL.add(id); renderClaims(); }
+function selectRunnerClaims(ids){ ids.forEach(id=>CLAIM_SEL.add(id)); renderClaims(); }
 function renderClaims(){
   const el=document.getElementById('view');
-  // group by runner
+  const canPay=(ME.role==='admin'||ME.role==='account');
   const groups={};
   CLAIMS.forEach(c=>{ const k=c.runner_name||'(tiada runner)'; (groups[k]=groups[k]||[]).push(c); });
-  const tab=(k,l)=>`<button class="${CLAIM_TAB===k?'active':''}" onclick="CLAIM_TAB='${k}';loadClaims().then(renderClaims)">${l}</button>`;
+  const tab=(k,l)=>`<button class="${CLAIM_TAB===k?'active':''}" onclick="CLAIM_TAB='${k}';CLAIM_SEL.clear();loadClaims().then(renderClaims)">${l}</button>`;
   let html=`<div class="subtabs" style="margin-bottom:12px">${tab('pending','Belum Bayar')}${tab('paid','Dah Bayar')}${tab('all','Semua')}</div>`;
+  if(CLAIM_SEL.size>0 && canPay){
+    const total=CLAIMS.filter(c=>CLAIM_SEL.has(c.order_id)).reduce((s,c)=>s+(+c.claim_amount||0),0);
+    html+=`<div class="bulkbar"><b>${CLAIM_SEL.size} claim dipilih → RM${total.toFixed(2)}</b>
+      <button class="btn btn-green btn-sm" onclick="settleSelected()">Confirm & Tandakan Dah Bayar</button>
+      <button class="btn btn-out btn-sm" onclick="CLAIM_SEL.clear();renderClaims()">Batal</button></div>`;
+  }
   const runners=Object.keys(groups);
   if(!runners.length){ html+='<div class="empty">Tiada claim.</div>'; el.innerHTML=html; return; }
   runners.forEach(rn=>{
     const list=groups[rn]; const total=list.reduce((s,c)=>s+(+c.claim_amount||0),0);
+    const pendingIds=list.filter(c=>c.claim_status==='pending').map(c=>c.order_id);
     html+=`<div class="card"><div class="top">
       <div class="oid">${esc(rn)}</div>
-      <div class="amt">RM${total.toFixed(2)}${CLAIM_TAB==='pending'&&(ME.role==='admin'||ME.role==='account')?
-        ` <button class="btn btn-green btn-sm" onclick="payRunner('${esc(rn)}')">Tandakan Dah Bayar</button>`:''}</div>
+      <div class="amt">RM${total.toFixed(2)}${canPay&&pendingIds.length?` <button class="btn btn-out btn-sm" onclick="selectRunnerClaims(${JSON.stringify(pendingIds).replace(/"/g,'&quot;')})">Tick semua</button>`:''}</div>
     </div>
     <table class="tbl" style="margin-top:8px"><tbody>${list.map(c=>`<tr>
-      <td>#${esc(c.order_id)}</td><td>${esc(c.customer_name)}</td>
-      <td>RM${(+c.claim_amount).toFixed(2)}</td>
+      <td style="white-space:nowrap">${canPay&&c.claim_status==='pending'?`<input type="checkbox" class="selbox" ${CLAIM_SEL.has(c.order_id)?'checked':''} onclick="claimToggle('${esc(c.order_id)}')">`:''}#${esc(c.order_id)}</td>
+      <td>${esc(c.customer_name)}</td><td>RM${(+c.claim_amount).toFixed(2)}</td>
       <td><span class="pill pill-${c.claim_status==='paid'?'paid':'pending'}">${c.claim_status}</span></td>
     </tr>`).join('')}</tbody></table></div>`;
   });
   el.innerHTML=html;
 }
-async function payRunner(runnerName){
-  const ids=CLAIMS.filter(c=>(c.runner_name||'(tiada runner)')===runnerName && c.claim_status==='pending').map(c=>c.order_id);
-  if(!ids.length) return;
-  if(!confirm(`Tandakan ${ids.length} claim ${runnerName} sebagai DAH BAYAR?`)) return;
+async function settleSelected(){
+  const ids=[...CLAIM_SEL]; if(!ids.length) return;
+  const total=CLAIMS.filter(c=>CLAIM_SEL.has(c.order_id)).reduce((s,c)=>s+(+c.claim_amount||0),0);
+  if(!confirm(`Tandakan ${ids.length} claim (RM${total.toFixed(2)}) sebagai DAH BAYAR? Runner akan dapat notis dalam app.`)) return;
   try{ await api('/claims/pay',{method:'POST',body:JSON.stringify({order_ids:ids})});
-    toast('Ditanda dibayar'); await loadClaims(); renderClaims();
+    toast('Dibayar ✓ — runner dinotifikasikan'); CLAIM_SEL.clear(); await loadClaims(); renderClaims();
   }catch(e){ toast('Gagal: '+e.message); }
+}
+
+// ==== DASHBOARD ====
+let CH1=null, CH2=null;
+function renderDashboard(){
+  const el=document.getElementById('view');
+  const today=ORDERS.filter(o=>isToday(o.created_at));
+  const salesToday=today.reduce((s,o)=>s+(+o.total_amount||0),0);
+  const pending=ORDERS.filter(o=>o.status==='PENDING').length;
+  const onDel=ORDERS.filter(o=>o.status==='ASSIGNED'||o.status==='ON_DELIVERY').length;
+  const rated=ORDERS.filter(o=>o.rating); const avg=rated.length?(rated.reduce((s,o)=>s+o.rating,0)/rated.length):0;
+  const days=[]; for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); days.push(d); }
+  const kOf=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const trend=days.map(d=>ORDERS.filter(o=>(o.created_at||'').slice(0,10)===kOf(d)).reduce((s,o)=>s+(+o.total_amount||0),0));
+  const dayLbl=days.map(d=>['Ahd','Isn','Sel','Rab','Kha','Jum','Sab'][d.getDay()]);
+  const byForm={}; ORDERS.forEach(o=>{ const k=o.form_name||'(lain)'; byForm[k]=(byForm[k]||0)+1; });
+  const formLbls=Object.keys(byForm), formVals=formLbls.map(k=>byForm[k]);
+  const byRunner={}; ORDERS.forEach(o=>{ if(o.runner_name){ const r=byRunner[o.runner_name]=byRunner[o.runner_name]||{n:0,rate:[],name:o.runner_name}; r.n++; if(o.rating) r.rate.push(o.rating); } });
+  const top=Object.values(byRunner).sort((a,b)=>b.n-a.n).slice(0,5);
+  const st=(l,n,d)=>`<div class="stat"><div class="l">${l}</div><div class="n">${n}</div>${d?`<div class="d" style="color:var(--mid)">${d}</div>`:''}</div>`;
+  el.innerHTML=`
+    <div class="dgrid">
+      ${st('Order hari ni',today.length)}${st('Jualan hari ni','RM'+salesToday.toFixed(0))}
+      ${st('Belum assign',pending)}${st('Dalam hantaran',onDel)}
+      ${st('Rating purata',avg?avg.toFixed(1)+'★':'-',rated.length+' penilaian')}
+    </div>
+    <div class="panel"><h4>Jualan 7 hari lepas</h4><div style="position:relative;height:200px"><canvas id="chTrend" role="img" aria-label="Carta jualan tujuh hari"></canvas></div></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">
+      <div class="panel"><h4>Order ikut cawangan</h4><div style="position:relative;height:210px"><canvas id="chForm" role="img" aria-label="Order ikut cawangan"></canvas></div></div>
+      <div class="panel"><h4>Runner terbaik</h4>${top.map((r,i)=>`<div class="drow"><b style="width:20px">${i+1}</b><span style="flex:1">${esc(r.name)}</span><span style="color:var(--mid)">${r.n} order</span>${r.rate.length?`<span style="color:#f59e0b">★${(r.rate.reduce((s,x)=>s+x,0)/r.rate.length).toFixed(1)}</span>`:''}</div>`).join('')||'<div class="empty">Tiada data runner.</div>'}</div>
+    </div>`;
+  if(CH1) CH1.destroy(); if(CH2) CH2.destroy();
+  const ink='#6b7280';
+  CH1=new Chart(document.getElementById('chTrend'),{type:'bar',data:{labels:dayLbl,datasets:[{data:trend,backgroundColor:'#1a7a4a',borderRadius:4,maxBarThickness:28}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{color:ink,callback:v=>'RM'+v},grid:{color:'#eee'}},x:{ticks:{color:ink},grid:{display:false}}}}});
+  CH2=new Chart(document.getElementById('chForm'),{type:'doughnut',data:{labels:formLbls,datasets:[{data:formVals,backgroundColor:['#14603a','#1a7a4a','#2d9e62','#8fce9d','#c0dd97','#639922','#f59e0b'],borderColor:'#fff',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}}}});
+}
+
+// ==== RUNNER PAYMENT NOTIFICATIONS ====
+let MY_NOTIFS=[];
+async function loadMyNotifs(){ const {notifications}=await api('/my/notifications'); MY_NOTIFS=notifications||[]; }
+function notifBanner(){
+  if(!MY_NOTIFS.length) return '';
+  const total=MY_NOTIFS.reduce((s,n)=>s+(+n.amount||0),0);
+  return `<div class="notif"><span>💰 Bayaran <b>RM${total.toFixed(2)}</b> telah dijelaskan kepada anda. Terima kasih!</span><button class="btn btn-out btn-sm" onclick="dismissNotifs()">OK</button></div>`;
+}
+async function dismissNotifs(){ MY_NOTIFS=[]; try{ await api('/my/notifications/seen',{method:'POST',body:'{}'}); }catch(e){} renderOrders(); }
+
+// ==== COMPLAINTS ====
+let COMPLAINTS=[];
+function openComplaint(){
+  showModal(`<h3>Buat Aduan</h3>
+    <div class="field"><label>Berkaitan order (pilihan)</label><input id="cmp-order" placeholder="cth #LS 3570"></div>
+    <div class="field"><label>Tajuk</label><input id="cmp-subj" placeholder="Ringkasan aduan"></div>
+    <div class="field"><label>Mesej *</label><textarea id="cmp-msg" rows="4" placeholder="Terangkan masalah…"></textarea></div>
+    <div class="btn-row"><button class="btn btn-green" onclick="submitComplaint()">Hantar Aduan</button><button class="btn btn-out" onclick="closeModal()">Batal</button></div>`);
+}
+async function submitComplaint(){
+  const v=s=>(document.getElementById(s)||{}).value||'';
+  if(!v('cmp-msg').trim()){ toast('Isi mesej dulu'); return; }
+  try{ await api('/complaints',{method:'POST',body:JSON.stringify({order_id:v('cmp-order').trim(),subject:v('cmp-subj').trim(),message:v('cmp-msg').trim()})});
+    closeModal(); toast('Aduan dihantar ✓');
+  }catch(e){ toast('Gagal: '+e.message); }
+}
+async function loadComplaints(){ const {complaints}=await api('/complaints'); COMPLAINTS=complaints||[]; }
+function renderComplaints(){
+  const el=document.getElementById('view');
+  el.innerHTML=`<table class="tbl"><thead><tr><th>Dari</th><th>Order</th><th>Aduan</th><th>Status</th><th></th></tr></thead>
+    <tbody>${COMPLAINTS.map(c=>`<tr>
+      <td>${esc(c.from_email)}<br><span style="font-size:11px;color:var(--mid)">${esc(c.from_role)}</span></td>
+      <td>${esc(c.order_id||'—')}</td>
+      <td>${c.subject?'<b>'+esc(c.subject)+'</b><br>':''}<span style="font-size:12px;color:var(--mid)">${esc(c.message)}</span></td>
+      <td><span class="pill pill-${c.status==='resolved'?'paid':'pending'}">${esc(c.status)}</span></td>
+      <td>${c.status==='open'?`<button class="btn btn-out btn-sm" onclick="resolveComplaint(${c.id})">Selesai</button>`:''}</td>
+    </tr>`).join('')||'<tr><td colspan=5 class="empty">Tiada aduan.</td></tr>'}</tbody></table>`;
+}
+async function resolveComplaint(id){
+  try{ await api('/complaints/'+id+'/resolve',{method:'POST',body:'{}'}); toast('Aduan selesai'); await loadComplaints(); renderComplaints(); }catch(e){ toast('Gagal: '+e.message); }
 }
 
 // ---- toast ----
