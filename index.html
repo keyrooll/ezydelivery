@@ -99,7 +99,7 @@
 <header>
   <div class="brand">
     <img src="logo/ezydelivery.png" alt="Ezydelivery">
-    <div><div class="name">Ezydelivery</div><div class="tag">Durian anda tanggungjawab kami</div></div>
+    <div><div class="name">Ezydelivery</div><div class="tag">Durian anda tanggungjawab kami · <span id="appver"></span></div></div>
   </div>
   <div class="who" id="who"></div>
 </header>
@@ -126,6 +126,7 @@
 
 <script>
 const CFG = DELIVERY_CONFIG;
+{ const _v=document.getElementById('appver'); if(_v) _v.textContent=CFG.version||''; }
 let ID_TOKEN=null, ME=null, VIEW='orders';
 let ORDERS=[], RUNNERS=[], USERS=[], CLAIMS=[], FORMS=[];
 let F={ q:'', status:'', today:false, session:'', form:'', kpi:'' }; // order filters
