@@ -170,7 +170,7 @@ async function onCredential(res){
     document.getElementById('signinView').style.display='none';
     document.getElementById('appView').style.display='block';
     renderWho(); buildNav();
-    VIEW = ME.role==='runner' ? 'myjobs' : (ME.role==='account' ? 'claims' : 'dashboard');
+    VIEW = ME.role==='runner' ? 'myjobs' : (ME.role==='account' ? 'runners' : 'dashboard');
     loadView();
   }catch(e){
     if(String(e.message).includes('401')) document.getElementById('noAccess').style.display='block';
@@ -197,13 +197,11 @@ async function api(path, opts={}){
 function buildNav(){
   const items=[];
   if(ME.role==='admin'||ME.role==='staff') items.push(['dashboard','Dashboard'],['orders','Order']);
-  if(ME.role==='admin') items.push(['runners','Runner'],['forms','Cawangan'],['users','Pengguna']);
-  if(ME.role==='admin'||ME.role==='account') items.push(['claims','Claim']);
+  if(ME.role==='admin'||ME.role==='staff'||ME.role==='account') items.push(['runners','Runner']);
+  if(ME.role==='admin') items.push(['forms','Cawangan'],['users','Pengguna']);
   if(ME.role==='runner') items.push(['myjobs','Hantaran Saya']);
-  if(ME.role==='admin') items.push(['complaints','Aduan']);
-  let html = items.map(([k,l])=>`<button data-v="${k}" class="${k===VIEW?'active':''}" onclick="go('${k}')">${l}</button>`).join('');
-  html += `<button onclick="openComplaint()">＋ Buat Aduan</button>`; // any role
-  document.getElementById('nav').innerHTML = html;
+  items.push(['complaints','Aduan']); // all roles
+  document.getElementById('nav').innerHTML = items.map(([k,l])=>`<button data-v="${k}" class="${k===VIEW?'active':''}" onclick="go('${k}')">${l}</button>`).join('');
 }
 function go(v){ VIEW=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v)); loadView(); }
 
@@ -213,11 +211,10 @@ async function loadView(){
     if(VIEW==='dashboard'){ await Promise.all([loadOrders(), loadRunners().catch(()=>{}), loadForms().catch(()=>{})]); renderDashboard(); }
     else if(VIEW==='orders'){ await Promise.all([loadOrders(), loadRunners().catch(()=>{}), loadForms().catch(()=>{})]); renderOrders(); }
     else if(VIEW==='myjobs'){ await Promise.all([loadOrders(), loadMyNotifs().catch(()=>{})]); renderOrders(); }
-    else if(VIEW==='runners'){ await Promise.all([loadRunners(), loadOrders().catch(()=>{})]); renderRunners(); }
-    else if(VIEW==='forms'){ await loadForms(); renderForms(); }
-    else if(VIEW==='complaints'){ await loadComplaints(); renderComplaints(); }
+    else if(VIEW==='runners'){ await Promise.all([loadRunners(), loadOrders().catch(()=>{}), loadClaims().catch(()=>{})]); renderRunners(); }
+    else if(VIEW==='forms'){ await Promise.all([loadForms(), loadOrders().catch(()=>{})]); renderForms(); }
+    else if(VIEW==='complaints'){ if(ME.role==='admin'){ await loadComplaints(); } renderComplaints(); }
     else if(VIEW==='users'){ await Promise.all([loadUsers(),loadRunners(),loadOrders().catch(()=>{})]); renderUsers(); }
-    else if(VIEW==='claims'){ await loadClaims(); renderClaims(); }
   }catch(e){ el.innerHTML='<div class="empty">Gagal muat: '+e.message+'</div>'; }
 }
 
@@ -363,8 +360,12 @@ function bulkBar(){
       <option value="freelance">Runner Freelance</option><option value="lalamove">Lalamove</option>
     </select>
     <select id="brun" class="bfree">${opts||'<option value=\"\">(tiada runner)</option>'}</select>
-    <input id="bclm" class="bfree" type="number" step="0.50" placeholder="Claim RM/order" style="width:130px">
-    <input id="beta" placeholder="Anggaran tiba" style="width:120px">
+    <input id="bclm" class="bfree" type="number" step="0.50" placeholder="Claim RM/order" style="width:120px">
+    <input id="beta" placeholder="Anggaran tiba" style="width:110px">
+    <select id="btrkMode" onchange="document.getElementById('btrk').style.display=this.value==='same'?'':'none'">
+      <option value="none">Tracking: kosong</option><option value="same">Tracking sama semua</option><option value="each">Tracking asing (edit tiap order)</option>
+    </select>
+    <input id="btrk" placeholder="Tracking" style="width:120px;display:none">
     <button class="btn btn-green btn-sm" onclick="doBulkAssign()">Assign ${SEL.size} order</button>
     <button class="btn btn-out btn-sm" onclick="clearSel()">Batal</button>
   </div>`;
@@ -381,8 +382,10 @@ async function doBulkAssign(){
     if(!r){ toast('Pilih runner dulu'); return; }
     body.runner_id=r; const c=(document.getElementById('bclm')||{}).value; if(c) body.claim_amount=Number(c);
   }
+  const tm=(document.getElementById('btrkMode')||{}).value;
+  if(tm==='same'){ body.tracking=((document.getElementById('btrk')||{}).value||'').trim(); }
   try{ const res=await api('/orders/bulk-assign',{method:'POST',body:JSON.stringify(body)});
-    toast((res.assigned||0)+' order diassign'); SEL.clear(); await loadOrders(); renderOrders();
+    toast((res.assigned||0)+' order diassign'+((tm==='each')?' — set tracking asing melalui Edit tiap order':'')); SEL.clear(); await loadOrders(); renderOrders();
   }catch(e){ toast('Gagal: '+e.message); }
 }
 
@@ -435,13 +438,22 @@ function cardHTML(o, isMy){
     </div>`;
   }
   const canSelect = !isMy && o.status==='PENDING' && !isPickup;
-  return `<div class="card">
+  const strip={PENDING:'#eda100',ASSIGNED:'#2a78d6',ON_DELIVERY:'#4a3aa7',DELIVERED:'#1baf7a',CANCELED:'#e34948'}[o.status]||'#cbd5d1';
+  const slbl={PENDING:'belum assign',ASSIGNED:'assigned',ON_DELIVERY:'dalam hantaran',DELIVERED:'selesai',CANCELED:'batal'}[o.status]||o.status;
+  return `<div class="card" style="border-left:3px solid ${strip};padding-left:13px">
     <div class="top">
-      <div>${canSelect?`<input type="checkbox" class="selbox" ${SEL.has(o.order_id)?'checked':''} onclick="toggleSel('${esc(o.order_id)}')">`:''}<span class="oid">#${esc(o.order_id)}</span><span class="badge b-${o.status}">${o.status}</span> ${o.form_name?`<span class="pill" style="background:#e5e7eb;color:#374151">${esc(o.form_name)}</span>`:''}${sessionBadge(o)}${dpill}${claimPill}</div>
+      <div style="min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        ${canSelect?`<input type="checkbox" class="selbox" ${SEL.has(o.order_id)?'checked':''} onclick="toggleSel('${esc(o.order_id)}')">`:''}
+        <span class="oid">#${esc(o.order_id)}</span>
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:${strip}">${slbl}</span>
+      </div>
       <span class="amt">RM${(+o.total_amount||0).toFixed(2)}</span>
     </div>
-    <div class="cust">${esc(o.customer_name)} · ${esc(o.phone)}</div>
-    <div class="meta">${prod?prod+'<br>':''}${esc(o.address)}</div>
+    <div class="cust">${esc(o.customer_name)} <span style="color:var(--mid);font-weight:400">· ${esc(o.phone)}</span></div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px">
+      ${o.form_name?`<span class="pill" style="background:#eef2f0;color:#374151">📍 ${esc(o.form_name)}</span>`:''}${sessionBadge(o)}${dpill}${claimPill}
+    </div>
+    <div class="meta" style="margin-top:8px">${prod?'🛒 '+prod+'<br>':''}<span style="color:var(--mid)">${esc(o.address)}</span></div>
     ${actions}</div>`;
 }
 
@@ -543,20 +555,38 @@ async function saveManual(){
   }catch(e){ toast('Gagal: '+e.message); }
 }
 
-// ==== RUNNERS ====
+// ==== RUNNERS (list + KPI + claim settlement) ====
+let RUNNER_SUB='list';
 async function loadRunners(){ const {runners}=await api('/runners'); RUNNERS=runners||[]; }
 function renderRunners(){
   const el=document.getElementById('view');
-  el.innerHTML=`
-    <div class="toolbar"><button class="btn btn-ink btn-sm" onclick="openRunner()">+ Tambah Runner</button></div>
-    <table class="tbl"><thead><tr><th>Nama</th><th>Telefon</th><th>Login (email)</th><th>Status</th><th></th></tr></thead>
-    <tbody>${RUNNERS.map(r=>`<tr>
+  // KPI computed from ORDERS + RUNNERS
+  const active=RUNNERS.filter(r=>r.active).length;
+  const claims=ORDERS.filter(o=>o.delivery_type==='freelance'&&o.claim_amount!=null);
+  const pending=claims.filter(o=>o.claim_status==='pending').reduce((s,o)=>s+(+o.claim_amount||0),0);
+  const paid=claims.filter(o=>o.claim_status==='paid').reduce((s,o)=>s+(+o.claim_amount||0),0);
+  const delivered=ORDERS.filter(o=>o.status==='DELIVERED'&&o.runner_id).length;
+  const st=(l,n,c)=>`<div class="stat"><div class="l">${l}</div><div class="n"${c?` style="color:${c}"`:''}>${n}</div></div>`;
+  let html=`<div class="dgrid">
+    ${st('Runner aktif',active)}${st('Belum bayar','RM'+pending.toFixed(0),'#b91c1c')}
+    ${st('Dah bayar','RM'+paid.toFixed(0),'#166534')}${st('Jumlah hantaran',delivered)}
+  </div>
+  <div class="subtabs" style="margin-bottom:12px">
+    <button class="${RUNNER_SUB==='list'?'active':''}" onclick="RUNNER_SUB='list';renderRunners()">Senarai Runner</button>
+    <button class="${RUNNER_SUB==='claim'?'active':''}" onclick="RUNNER_SUB='claim';renderRunners()">Claim / Bayaran</button>
+  </div>`;
+  if(RUNNER_SUB==='claim'){ el.innerHTML=html+'<div id="claimZone"></div>'; renderClaimsInto('claimZone'); return; }
+  html+=`<div class="toolbar"><button class="btn btn-ink btn-sm" onclick="openRunner()">+ Tambah Runner</button></div>
+    <table class="tbl"><thead><tr><th>Nama</th><th>Telefon</th><th>Login</th><th>Belum Bayar</th><th>Status</th><th></th></tr></thead>
+    <tbody>${RUNNERS.map(r=>{ const s=runnerStats(r.id); return `<tr>
       <td><span class="lnk" onclick="openRunnerDetail('${esc(r.id)}')">${esc(r.name)}</span></td>
-      <td>${esc(r.phone||'')}</td><td>${esc(r.email||'—')}</td>
+      <td>${esc(r.phone||'')}</td><td style="font-size:11px;color:var(--mid)">${esc(r.email||'—')}</td>
+      <td>${s.pending?'<b style="color:#b91c1c">RM'+s.pending.toFixed(2)+'</b>':'—'}</td>
       <td>${r.active?'<span class="pill pill-free">Aktif</span>':'<span class="pill pill-pending">Nyahaktif</span>'}</td>
-      <td style="white-space:nowrap"><button class="btn btn-out btn-sm" onclick="toggleRunner('${esc(r.id)}',${r.active?0:1})">${r.active?'Nyahaktif':'Aktifkan'}</button>
+      <td style="white-space:nowrap"><button class="btn btn-out btn-sm" onclick="toggleRunner('${esc(r.id)}',${r.active?0:1})">${r.active?'Nyahaktif':'Aktif'}</button>
         <button class="btn btn-out btn-sm" style="color:#b91c1c;border-color:#fca5a5" onclick="deleteRunner('${esc(r.id)}','${esc(r.name)}')">Delete</button></td>
-    </tr>`).join('')||'<tr><td colspan=5 class="empty">Tiada runner.</td></tr>'}</tbody></table>`;
+    </tr>`;}).join('')||'<tr><td colspan=6 class="empty">Tiada runner.</td></tr>'}</tbody></table>`;
+  el.innerHTML=html;
 }
 async function deleteRunner(id,name){
   if(!confirm('Padam runner "'+name+'"? Order lama kekal tapi tak lagi terpaut pada runner ini.')) return;
@@ -616,19 +646,35 @@ async function toggleRunner(id,active){
 // ==== FORMS (branches) ====
 async function loadForms(){ const {forms}=await api('/forms'); FORMS=forms||[]; }
 let EDIT_FORM=null;
+let CHFORM=null;
 function renderForms(){
   const el=document.getElementById('view');
+  // Per-branch stats from ORDERS
+  const nameOf=id=>{ const f=FORMS.find(x=>x.form_id===id); return (f&&f.name)||id||'(tiada)'; };
+  const grp={};
+  ORDERS.forEach(o=>{ const k=o.form_name||nameOf(o.form_id); const g=grp[k]=grp[k]||{n:0,rm:0}; g.n++; g.rm+=(+o.total_amount||0); });
+  const rows=Object.entries(grp).sort((a,b)=>b[1].rm-a[1].rm);
+  const totRM=rows.reduce((s,r)=>s+r[1].rm,0);
+  const st=(l,n)=>`<div class="stat"><div class="l">${l}</div><div class="n">${n}</div></div>`;
   el.innerHTML=`
+    <div class="dgrid">${st('Cawangan aktif',FORMS.filter(f=>f.active).length)}${st('Jumlah order',ORDERS.length)}${st('Jumlah jualan','RM'+totRM.toFixed(0))}${st('Purata/cawangan','RM'+(rows.length?(totRM/rows.length).toFixed(0):0))}</div>
+    ${rows.length?`<div class="card" style="margin-bottom:14px"><div style="font-weight:600;margin-bottom:8px;font-size:13px">Jualan ikut cawangan (RM)</div><div style="height:220px"><canvas id="chBranch"></canvas></div></div>`:''}
     <p style="color:var(--mid);font-size:13px;margin:0 0 12px">Setiap borang OnPay = satu cawangan. Bagi nama supaya senang tapis order ikut cawangan. Toggle untuk aktif/nyahaktif.</p>
-    <table class="tbl"><thead><tr><th>Form ID</th><th>Nama Cawangan</th><th>Aktif</th><th></th></tr></thead>
-    <tbody>${FORMS.map(f=>{ const id=esc(f.form_id); const editing=EDIT_FORM===f.form_id; return `<tr>
+    <table class="tbl"><thead><tr><th>Form ID</th><th>Nama Cawangan</th><th>Order</th><th>Jualan</th><th>Aktif</th><th></th></tr></thead>
+    <tbody>${FORMS.map(f=>{ const id=esc(f.form_id); const editing=EDIT_FORM===f.form_id; const g=grp[f.name||nameOf(f.form_id)]||{n:0,rm:0}; return `<tr>
       <td>${id}</td>
       <td>${editing?`<input id="fn-${id}" value="${esc(f.name||'')}" style="padding:6px;border:1px solid var(--line);border-radius:6px;width:100%">`:`<b>${esc(f.name||'')}</b>`}</td>
+      <td>${g.n}</td><td>RM${g.rm.toFixed(2)}</td>
       <td><label class="switch"><input type="checkbox" ${f.active?'checked':''} onchange="toggleForm('${id}',this.checked?1:0)"><span class="sl"></span></label></td>
       <td style="white-space:nowrap">${editing
         ? `<button class="btn btn-green btn-sm" onclick="saveForm('${id}')">Simpan</button> <button class="btn btn-out btn-sm" onclick="EDIT_FORM=null;renderForms()">Batal</button>`
         : `<button class="btn btn-out btn-sm" onclick="EDIT_FORM='${id}';renderForms()">Edit</button>`}</td>
-    </tr>`;}).join('')||'<tr><td colspan=4 class="empty">Belum ada borang. Ia muncul auto bila order pertama masuk melalui webhook.</td></tr>'}</tbody></table>`;
+    </tr>`;}).join('')||'<tr><td colspan=6 class="empty">Belum ada borang. Ia muncul auto bila order pertama masuk melalui webhook.</td></tr>'}</tbody></table>`;
+  if(rows.length && window.Chart){
+    if(CHFORM) CHFORM.destroy();
+    const PAL=['#2a78d6','#1baf7a','#eda100','#4a3aa7','#e34948','#e87ba4','#eb6834','#008300'];
+    CHFORM=new Chart(document.getElementById('chBranch'),{type:'bar',data:{labels:rows.map(r=>r[0]),datasets:[{data:rows.map(r=>r[1].rm),backgroundColor:rows.map((_,i)=>PAL[i%PAL.length]),borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{callback:v=>'RM'+v}}}}});
+  }
 }
 async function saveForm(id){
   const name=((document.getElementById('fn-'+id)||{}).value||'').trim();
@@ -663,17 +709,65 @@ function openUserDetail(email){
     </div>${extra}
     <div class="btn-row"><button class="btn btn-out" onclick="closeModal()">Tutup</button></div>`);
 }
+let USER_SUB='staff';
+function customerList(){
+  const m={};
+  ORDERS.forEach(o=>{ const k=o.phone||o.customer_name; if(!k) return;
+    const c=m[k]=m[k]||{name:o.customer_name,phone:o.phone,email:o.email||'',n:0,spend:0,last:''};
+    c.n++; c.spend+=(+o.total_amount||0); if((o.created_at||'')>c.last) c.last=o.created_at; if(o.email&&!c.email) c.email=o.email; });
+  return Object.values(m).sort((a,b)=>b.spend-a.spend);
+}
 function renderUsers(){
   const el=document.getElementById('view');
-  el.innerHTML=`
-    <div class="toolbar"><button class="btn btn-ink btn-sm" onclick="openUser()">+ Beri Akses</button></div>
+  const staffU=USERS.filter(u=>['admin','account','staff'].includes(u.role));
+  const runnerU=USERS.filter(u=>u.role==='runner');
+  const custs=customerList();
+  const sub=(k,l,n)=>`<button class="${USER_SUB===k?'active':''}" onclick="USER_SUB='${k}';renderUsers()">${l} <span style="opacity:.7">${n}</span></button>`;
+  let html=`<div class="subtabs" style="margin-bottom:12px">${sub('staff','Staff',staffU.length)}${sub('runner','Runner',runnerU.length)}${sub('customer','Customer',custs.length)}${sub('all','Semua',USERS.length)}</div>`;
+  if(USER_SUB==='customer'){
+    const totSpend=custs.reduce((s,c)=>s+c.spend,0);
+    html+=`<div class="dgrid"><div class="stat"><div class="l">Jumlah customer</div><div class="n">${custs.length}</div></div>
+      <div class="stat"><div class="l">Jumlah jualan</div><div class="n">RM${totSpend.toFixed(0)}</div></div>
+      <div class="stat"><div class="l">Purata/customer</div><div class="n">RM${custs.length?(totSpend/custs.length).toFixed(0):0}</div></div></div>
+      <table class="tbl"><thead><tr><th>Nama</th><th>Telefon</th><th>Order</th><th>Jumlah Belanja</th></tr></thead>
+      <tbody>${custs.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.phone)}</td><td>${c.n}</td><td><b>RM${c.spend.toFixed(2)}</b></td></tr>`).join('')||'<tr><td colspan=4 class="empty">Tiada customer.</td></tr>'}</tbody></table>`;
+    el.innerHTML=html; return;
+  }
+  const list = USER_SUB==='staff'?staffU : USER_SUB==='runner'?runnerU : USERS;
+  html+=`<div class="toolbar"><button class="btn btn-ink btn-sm" onclick="openUser()">+ Beri Akses</button></div>
     <table class="tbl"><thead><tr><th>Email</th><th>Role</th><th>Runner</th><th>Status</th><th></th></tr></thead>
-    <tbody>${USERS.map(u=>`<tr>
+    <tbody>${list.map(u=>`<tr>
       <td><span class="lnk" onclick="openUserDetail('${esc(u.email)}')">${esc(u.email)}</span></td><td><span class="pill pill-free">${esc(u.role)}</span></td>
       <td>${esc(u.runner_name||'—')}</td>
       <td>${u.active?'Aktif':'Nyahaktif'}</td>
-      <td>${u.email==='keyrooll@gmail.com'?'':`<button class="btn btn-out btn-sm" onclick="toggleUser('${esc(u.email)}',${u.active?0:1})">${u.active?'Nyahaktif':'Aktifkan'}</button>`}</td>
-    </tr>`).join('')}</tbody></table>`;
+      <td style="white-space:nowrap">${u.email==='keyrooll@gmail.com'?'':`<button class="btn btn-out btn-sm" onclick="openEditUser('${esc(u.email)}')">Edit</button>
+        <button class="btn btn-out btn-sm" onclick="toggleUser('${esc(u.email)}',${u.active?0:1})">${u.active?'Nyahaktif':'Aktif'}</button>
+        <button class="btn btn-out btn-sm" style="color:#b91c1c;border-color:#fca5a5" onclick="deleteUser('${esc(u.email)}')">Delete</button>`}</td>
+    </tr>`).join('')||'<tr><td colspan=5 class="empty">Tiada pengguna.</td></tr>'}</tbody></table>`;
+  el.innerHTML=html;
+}
+function openEditUser(email){
+  const u=USERS.find(x=>x.email===email); if(!u) return;
+  const runOpts=RUNNERS.filter(r=>r.active).map(r=>`<option value="${esc(r.id)}" ${u.runner_id===r.id?'selected':''}>${esc(r.name)}</option>`).join('');
+  showModal(`<h3>Edit Pengguna</h3>
+    <div class="field"><label>Email</label><input value="${esc(email)}" disabled></div>
+    <div class="field"><label>Role</label><select id="eu-role" onchange="document.getElementById('eu-runbox').style.display=this.value==='runner'?'':'none'">
+      ${['staff','account','admin','runner'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${r}</option>`).join('')}</select></div>
+    <div class="field" id="eu-runbox" style="display:${u.role==='runner'?'':'none'}"><label>Runner</label><select id="eu-runner">${runOpts}</select></div>
+    <div class="btn-row"><button class="btn btn-green" onclick="saveEditUser('${esc(email)}')">Simpan</button><button class="btn btn-out" onclick="closeModal()">Batal</button></div>`);
+}
+async function saveEditUser(email){
+  const role=document.getElementById('eu-role').value;
+  const body={role}; if(role==='runner') body.runner_id=document.getElementById('eu-runner').value; else body.runner_id='';
+  try{ await api(`/users/${encodeURIComponent(email)}`,{method:'POST',body:JSON.stringify(body)});
+    closeModal(); toast('Dikemaskini'); await loadUsers(); renderUsers();
+  }catch(e){ toast('Gagal: '+e.message); }
+}
+async function deleteUser(email){
+  if(!confirm('Padam akses "'+email+'"?')) return;
+  try{ await api(`/users/${encodeURIComponent(email)}/delete`,{method:'POST',body:'{}'});
+    toast('Dipadam'); await loadUsers(); renderUsers();
+  }catch(e){ toast('Gagal: '+e.message); }
 }
 function openUser(){
   const runOpts=RUNNERS.filter(r=>r.active).map(r=>`<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('');
@@ -707,20 +801,20 @@ async function toggleUser(email,active){
 // ==== CLAIMS ====
 async function loadClaims(){ const {claims}=await api('/claims?status='+CLAIM_TAB); CLAIMS=claims||[]; }
 let CLAIM_SEL=new Set();
-function claimToggle(id){ CLAIM_SEL.has(id)?CLAIM_SEL.delete(id):CLAIM_SEL.add(id); renderClaims(); }
-function selectRunnerClaims(ids){ ids.forEach(id=>CLAIM_SEL.add(id)); renderClaims(); }
-function renderClaims(){
-  const el=document.getElementById('view');
+function claimToggle(id){ CLAIM_SEL.has(id)?CLAIM_SEL.delete(id):CLAIM_SEL.add(id); renderClaimsInto('claimZone'); }
+function selectRunnerClaims(ids){ ids.forEach(id=>CLAIM_SEL.add(id)); renderClaimsInto('claimZone'); }
+function renderClaimsInto(elId){
+  const el=document.getElementById(elId); if(!el) return;
   const canPay=(ME.role==='admin'||ME.role==='account');
   const groups={};
   CLAIMS.forEach(c=>{ const k=c.runner_name||'(tiada runner)'; (groups[k]=groups[k]||[]).push(c); });
-  const tab=(k,l)=>`<button class="${CLAIM_TAB===k?'active':''}" onclick="CLAIM_TAB='${k}';CLAIM_SEL.clear();loadClaims().then(renderClaims)">${l}</button>`;
+  const tab=(k,l)=>`<button class="${CLAIM_TAB===k?'active':''}" onclick="CLAIM_TAB='${k}';CLAIM_SEL.clear();loadClaims().then(()=>renderClaimsInto('${elId}'))">${l}</button>`;
   let html=`<div class="subtabs" style="margin-bottom:12px">${tab('pending','Belum Bayar')}${tab('paid','Dah Bayar')}${tab('all','Semua')}</div>`;
   if(CLAIM_SEL.size>0 && canPay){
     const total=CLAIMS.filter(c=>CLAIM_SEL.has(c.order_id)).reduce((s,c)=>s+(+c.claim_amount||0),0);
     html+=`<div class="bulkbar"><b>${CLAIM_SEL.size} claim dipilih → RM${total.toFixed(2)}</b>
       <button class="btn btn-green btn-sm" onclick="settleSelected()">Confirm & Tandakan Dah Bayar</button>
-      <button class="btn btn-out btn-sm" onclick="CLAIM_SEL.clear();renderClaims()">Batal</button></div>`;
+      <button class="btn btn-out btn-sm" onclick="CLAIM_SEL.clear();renderClaimsInto('claimZone')">Batal</button></div>`;
   }
   const runners=Object.keys(groups);
   if(!runners.length){ html+='<div class="empty">Tiada claim.</div>'; el.innerHTML=html; return; }
@@ -744,7 +838,7 @@ async function settleSelected(){
   const total=CLAIMS.filter(c=>CLAIM_SEL.has(c.order_id)).reduce((s,c)=>s+(+c.claim_amount||0),0);
   if(!confirm(`Tandakan ${ids.length} claim (RM${total.toFixed(2)}) sebagai DAH BAYAR? Runner akan dapat notis dalam app.`)) return;
   try{ await api('/claims/pay',{method:'POST',body:JSON.stringify({order_ids:ids})});
-    toast('Dibayar ✓ — runner dinotifikasikan'); CLAIM_SEL.clear(); await loadClaims(); renderClaims();
+    toast('Dibayar ✓ — runner dinotifikasikan'); CLAIM_SEL.clear(); await loadClaims(); renderClaimsInto('claimZone');
   }catch(e){ toast('Gagal: '+e.message); }
 }
 
@@ -780,7 +874,8 @@ function renderDashboard(){
   if(CH1) CH1.destroy(); if(CH2) CH2.destroy();
   const ink='#6b7280';
   CH1=new Chart(document.getElementById('chTrend'),{type:'bar',data:{labels:dayLbl,datasets:[{data:trend,backgroundColor:'#1a7a4a',borderRadius:4,maxBarThickness:28}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{color:ink,callback:v=>'RM'+v},grid:{color:'#eee'}},x:{ticks:{color:ink},grid:{display:false}}}}});
-  CH2=new Chart(document.getElementById('chForm'),{type:'doughnut',data:{labels:formLbls,datasets:[{data:formVals,backgroundColor:['#14603a','#1a7a4a','#2d9e62','#8fce9d','#c0dd97','#639922','#f59e0b'],borderColor:'#fff',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}}}});
+  const PAL=['#2a78d6','#1baf7a','#eda100','#4a3aa7','#e34948','#e87ba4','#eb6834','#008300'];
+  CH2=new Chart(document.getElementById('chForm'),{type:'doughnut',data:{labels:formLbls,datasets:[{data:formVals,backgroundColor:PAL,borderColor:'#fff',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,cutout:'58%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11},generateLabels:(ch)=>{const d=ch.data,tot=d.datasets[0].data.reduce((a,b)=>a+b,0);return d.labels.map((l,i)=>{const v=d.datasets[0].data[i],p=tot?Math.round(v/tot*100):0;return{text:`${l} ${p}%`,fillStyle:PAL[i%PAL.length],strokeStyle:'#fff',lineWidth:1,index:i};});}}}}}});
 }
 
 // ==== RUNNER PAYMENT NOTIFICATIONS ====
@@ -812,7 +907,13 @@ async function submitComplaint(){
 async function loadComplaints(){ const {complaints}=await api('/complaints'); COMPLAINTS=complaints||[]; }
 function renderComplaints(){
   const el=document.getElementById('view');
-  el.innerHTML=`<table class="tbl"><thead><tr><th>Dari</th><th>Order</th><th>Aduan</th><th>Status</th><th></th></tr></thead>
+  const top=`<div class="toolbar"><button class="btn btn-ink btn-sm" onclick="openComplaint()">＋ Buat Aduan</button></div>`;
+  if(ME.role!=='admin'){ el.innerHTML=top+`<div class="empty">Tekan "Buat Aduan" untuk hantar aduan. Admin akan uruskan.</div>`; return; }
+  const open=COMPLAINTS.filter(c=>c.status!=='resolved').length, done=COMPLAINTS.filter(c=>c.status==='resolved').length;
+  const st=(l,n,c)=>`<div class="stat"><div class="l">${l}</div><div class="n"${c?` style="color:${c}"`:''}>${n}</div></div>`;
+  el.innerHTML=top+`<div class="dgrid">${st('Jumlah aduan',COMPLAINTS.length)}${st('Belum selesai',open,'#b91c1c')}${st('Dah selesai',done,'#166534')}</div>
+    ${COMPLAINTS.length?`<div class="card" style="margin-bottom:14px"><div style="font-weight:600;margin-bottom:8px;font-size:13px">Status aduan</div><div style="height:200px"><canvas id="chComp"></canvas></div></div>`:''}
+    <table class="tbl"><thead><tr><th>Dari</th><th>Order</th><th>Aduan</th><th>Status</th><th></th></tr></thead>
     <tbody>${COMPLAINTS.map(c=>`<tr>
       <td>${esc(c.from_email)}<br><span style="font-size:11px;color:var(--mid)">${esc(c.from_role)}</span></td>
       <td>${esc(c.order_id||'—')}</td>
@@ -820,6 +921,10 @@ function renderComplaints(){
       <td><span class="pill pill-${c.status==='resolved'?'paid':'pending'}">${esc(c.status)}</span></td>
       <td>${c.status==='open'?`<button class="btn btn-out btn-sm" onclick="resolveComplaint(${c.id})">Selesai</button>`:''}</td>
     </tr>`).join('')||'<tr><td colspan=5 class="empty">Tiada aduan.</td></tr>'}</tbody></table>`;
+  if(COMPLAINTS.length && window.Chart){
+    if(window.CHCOMP) window.CHCOMP.destroy();
+    window.CHCOMP=new Chart(document.getElementById('chComp'),{type:'doughnut',data:{labels:['Belum selesai','Dah selesai'],datasets:[{data:[open,done],backgroundColor:['#e34948','#1baf7a'],borderColor:'#fff',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,cutout:'58%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}}}});
+  }
 }
 async function resolveComplaint(id){
   try{ await api('/complaints/'+id+'/resolve',{method:'POST',body:'{}'}); toast('Aduan selesai'); await loadComplaints(); renderComplaints(); }catch(e){ toast('Gagal: '+e.message); }

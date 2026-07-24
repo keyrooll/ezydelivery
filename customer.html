@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Order Saya — EzyDurian</title>
+<style>
+  :root{ --green:#1a7a4a; --line:#e3e8e5; --mid:#6b7280; --ink:#14241c; --bg:#f4f6f5; }
+  *{ box-sizing:border-box; } body{ margin:0; background:var(--bg); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:var(--ink); }
+  .wrap{ max-width:520px; margin:0 auto; min-height:100vh; background:#fff; }
+  header{ background:var(--green); color:#fff; padding:16px; display:flex; justify-content:space-between; align-items:center; }
+  header .b{ font-size:18px; font-weight:800; } header .s{ font-size:12px; opacity:.85; margin-top:2px; }
+  #logout{ background:rgba(255,255,255,.2); color:#fff; border:none; border-radius:8px; padding:7px 12px; font-size:12px; cursor:pointer; display:none; }
+  .pad{ padding:16px; }
+  .hero{ text-align:center; padding:48px 20px; }
+  .hero h1{ font-size:20px; margin:14px 0 6px; } .hero p{ color:var(--mid); font-size:14px; margin:0 0 22px; }
+  .gbox{ display:flex; justify-content:center; }
+  .kpi{ display:flex; gap:10px; padding:0 16px 4px; }
+  .kpi .s{ flex:1; background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:12px; text-align:center; }
+  .kpi .n{ font-size:20px; font-weight:800; color:var(--green); } .kpi .l{ font-size:11px; color:var(--mid); margin-top:2px; }
+  .card{ border:1px solid var(--line); border-left:3px solid #ccc; border-radius:12px; padding:14px; margin:0 16px 12px; }
+  .top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .oid{ font-weight:700; } .amt{ font-weight:800; white-space:nowrap; }
+  .st{ font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; }
+  .meta{ font-size:13px; color:var(--mid); margin-top:8px; line-height:1.5; }
+  .track{ display:inline-block; margin-top:10px; background:var(--green); color:#fff; text-decoration:none; border-radius:9px; padding:9px 16px; font-size:13px; font-weight:700; }
+  .load{ text-align:center; padding:60px 16px; color:var(--mid); }
+  .foot{ text-align:center; font-size:11px; color:var(--mid); padding:20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><div><div class="b">🌱 EzyDurian</div><div class="s">Order Saya</div></div><button id="logout" onclick="logout()">Log keluar</button></header>
+  <div id="content"><div class="load">Memuatkan…</div></div>
+  <div class="foot">EzyDurian · v1.3</div>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script>
+const WORKER='https://ezydelivery.keyrooll.workers.dev';
+const CLIENT_ID='27154479564-ufljm52nmlh4gg7ie54knphff44jvrrq.apps.googleusercontent.com';
+const TRACK_BASE='https://keyrooll.github.io/ezydelivery/track.html';
+const STRIP={PENDING:'#eda100',ASSIGNED:'#2a78d6',ON_DELIVERY:'#4a3aa7',DELIVERED:'#1baf7a',CANCELED:'#e34948'};
+const SLBL={PENDING:'Diterima',ASSIGNED:'Runner ditugaskan',ON_DELIVERY:'Dalam hantaran',DELIVERED:'Selesai',CANCELED:'Batal'};
+let TOKEN=sessionStorage.getItem('ezycust')||'';
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fmtDate(x){ if(!x) return ''; const d=new Date(x); return isNaN(d)?'':d.toLocaleDateString('ms-MY',{day:'numeric',month:'short',year:'numeric'}); }
+function prodLine(p){ if(Array.isArray(p)) return p.map(x=>esc(x.name)+(x.qty?' ×'+x.qty:'')).join(', '); return esc(p||''); }
+
+function showLogin(msg){
+  document.getElementById('logout').style.display='none';
+  document.getElementById('content').innerHTML=`<div class="hero">
+    <div style="font-size:40px">🌱</div>
+    <h1>Selamat datang</h1>
+    <p>${msg||'Log masuk untuk lihat semua order &amp; jejak penghantaran anda.'}</p>
+    <div class="gbox"><div id="gbtn"></div></div>
+  </div>`;
+  if(window.google){ google.accounts.id.renderButton(document.getElementById('gbtn'),{theme:'filled_green',size:'large',text:'signin_with',shape:'pill'}); }
+}
+function onCred(resp){ TOKEN=resp.credential; sessionStorage.setItem('ezycust',TOKEN); load(); }
+function logout(){ TOKEN=''; sessionStorage.removeItem('ezycust'); if(window.google) google.accounts.id.disableAutoSelect(); showLogin(); }
+
+async function load(){
+  if(!TOKEN){ showLogin(); return; }
+  document.getElementById('content').innerHTML='<div class="load">Memuatkan order anda…</div>';
+  let d;
+  try{
+    const r=await fetch(`${WORKER}/customer/orders`,{headers:{Authorization:'Bearer '+TOKEN}});
+    if(r.status===401){ TOKEN=''; sessionStorage.removeItem('ezycust'); showLogin('Sesi tamat. Sila log masuk semula.'); return; }
+    d=await r.json();
+  }catch(e){ document.getElementById('content').innerHTML='<div class="load">Ralat sambungan. Cuba lagi.</div>'; return; }
+  document.getElementById('logout').style.display='';
+  const orders=d.orders||[];
+  const spend=orders.reduce((s,o)=>s+(+o.total_amount||0),0);
+  const active=orders.filter(o=>o.status!=='DELIVERED'&&o.status!=='CANCELED').length;
+  let html=`<div class="pad" style="padding-bottom:4px"><div style="font-size:13px;color:var(--mid)">Log masuk sebagai <b>${esc(d.email)}</b></div></div>
+    <div class="kpi">
+      <div class="s"><div class="n">${orders.length}</div><div class="l">Jumlah order</div></div>
+      <div class="s"><div class="n">${active}</div><div class="l">Sedang aktif</div></div>
+      <div class="s"><div class="n">RM${spend.toFixed(0)}</div><div class="l">Jumlah belanja</div></div>
+    </div>`;
+  if(!orders.length){ html+=`<div class="load">Belum ada order dengan emel ini.<br><span style="font-size:12px">Order dipadankan ikut emel yang anda guna semasa membeli.</span></div>`; }
+  orders.forEach(o=>{
+    const c=STRIP[o.status]||'#ccc';
+    html+=`<div class="card" style="border-left-color:${c}">
+      <div class="top">
+        <div><div class="oid">#${esc(o.order_id)}</div><div class="st" style="color:${c}">${SLBL[o.status]||esc(o.status)}</div></div>
+        <div class="amt">RM${(+o.total_amount||0).toFixed(2)}</div>
+      </div>
+      <div class="meta">🛒 ${prodLine(o.products)}<br>
+        <span style="color:#9aa3a0">${fmtDate(o.created_at)}${o.runner_name?' · Runner: '+esc(o.runner_name):''}</span></div>
+      ${o.track_token?`<a class="track" href="${TRACK_BASE}?o=${encodeURIComponent(o.order_id)}&t=${esc(o.track_token)}">Jejak penghantaran →</a>`:''}
+    </div>`;
+  });
+  document.getElementById('content').innerHTML=html;
+}
+
+window.onload=function(){
+  if(window.google){
+    google.accounts.id.initialize({client_id:CLIENT_ID,callback:onCred});
+  }
+  if(TOKEN) load(); else showLogin();
+};
+</script>
+</body>
+</html>
